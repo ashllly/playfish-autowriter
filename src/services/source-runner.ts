@@ -4,6 +4,12 @@ import { nanoid } from 'nanoid';
 
 export async function runSourceRunner() {
   console.log('Starting Source Runner...');
+  if (!notion || !(notion as any).databases) {
+    console.error('Notion client not initialized correctly:', notion);
+    throw new Error('Notion client misconfiguration');
+  }
+  console.log('Notion client ready. Databases available:', Object.keys((notion as any).databases || {}));
+  console.log('Typeof notion.databases.query:', typeof (notion as any).databases?.query);
 
   // 1. Query Source DB for items that need processing
   // Criteria: Title is empty OR SourceID is empty
