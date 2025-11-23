@@ -17,7 +17,8 @@ export async function GET(request: Request) {
 
     // 2. Run Draft Runner
     console.log('▶️ Step 2: Running Draft Runner...');
-    const draftResult = await runDraftRunner();
+    // Limit to 1 article per day to prevent Vercel timeout (especially with image gen)
+    const draftResult = await runDraftRunner({ limit: 1 });
     results.draft = draftResult;
     console.log('✅ Draft Runner done:', draftResult);
 

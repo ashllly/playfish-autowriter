@@ -103,6 +103,41 @@ GPT 判断 TargetBlog (Immigrant/Playfish/FIRE) - 对应 Notion DB: Blog-Immigra
 
 ---
 
+# 🖼️ 封面图生成规范 (Cover Image Style Guide)
+
+> 目标：**写实、干净、高质量、主题相关、专业可信赖、统一尺寸的横幅封面图。**
+
+## 1. 风格要求 (Style)
+- **写实风格 (Realistic Photography)**：必须是真实摄影感，拒绝插画、动漫、艺术滤镜。
+- **颜色清爽 (Clean & Bright)**：冷色调/中性色调（浅蓝、米白、木纹、灰），避免高饱和度色。
+- **构图简单 (Simple Composition)**：中心主体清晰，留白多，避免拥挤。
+- **主题相关 (Thematic)**：
+  - **移民 (Immigrant)**：城市风景、护照、机场、行李箱、地图、欧洲地标
+  - **物价 (Cost of Living)**：咖啡、餐桌、购物场景、账单、超市、货币
+  - **FIRE (Finance)**：桌面、笔记本电脑、账本、计算器、美元、储蓄概念
+
+## 2. 技术规范 (Specs)
+- **尺寸**：`1920 x 806` px (约 2.38:1)
+  - *注：DALL-E 3 生成 1792x1024，由前端 CSS 裁剪显示。*
+- **模型**：OpenAI DALL-E 3 (`quality: standard`, `size: 1792x1024`)
+- **存储**：Cloudflare R2 (自动上传并获取 URL)
+- **字段**：写入 Notion Blog DB 的 `Cover` 字段 (URL)
+
+## 3. 自动化策略 (Hybrid Strategy)
+由于 Vercel Hobby Plan 的限制（Cron 每天1次，执行时间限制 10-60秒），采取 **混合策略**：
+
+1. **Cron Job (Draft Runner)**
+   - 每日自动运行。
+   - **限制处理 1 篇** 文章（Draft + SEO + Cover）。
+   - 如果超时或失败，不影响已生成的文本内容。
+
+2. **Dashboard (Cover Generator)**
+   - 提供 "Generate All Missing Covers" 按钮。
+   - 前端队列机制，逐个调用 API 生成图片，避免服务器端超时。
+   - 作为批量补全和重试的兜底方案。
+
+---
+
 ## 📌 三、数据库结构（Data Model）
 
 ### 🟦 1. **Playfish-Blog-Source（灵感库）**
@@ -278,7 +313,13 @@ PF-SEO 将优先从以下列表中选择标签。如果都不合适，GPT 可以
    - tag-slug (对应标签的英文 Slug)
    - Section (根据 TargetBlog 自动映射：playfish/fire/immigrant)
 
-6. **Draft 生成完成后，系统自动勾选 Source DB 的 Used**
+6. **尝试自动生成封面图 (Image Runner)：**
+   - 调用 DALL-E 3 生成符合规范的图片
+   - 上传至 Cloudflare R2
+   - 写入 Blog DB 的 `Cover` 字段
+   - *注：Cron 模式下每次限处理 1 篇，防超时*
+
+7. **Draft 生成完成后，系统自动勾选 Source DB 的 Used**
    - 此时 `Send`=✅, `Used`=✅ -> 流程结束，不会重复触发
    - 如需重跑，手动取消 `Used` 即可
 
@@ -298,7 +339,7 @@ PF-SEO 将优先从以下列表中选择标签。如果都不合适，GPT 可以
    - 这是 Playfish 主网站 project 功能
    - 与 autowriter 不互相影响
 
-2. **触发翻译成多语言（将创建相应命令集，暂时还没有）**
+2. **触发 Translation Runner，自动翻译成多语言（将创建相应命令集，暂时还没有）**
    - 英文版本
    - 繁体中文版本
    - 自动创建对应语言版本的 Blog 条目
@@ -315,9 +356,9 @@ PF-SEO 将优先从以下列表中选择标签。如果都不合适，GPT 可以
 - 触发方式：**用户勾选 Send 后自动触发**，检测 Source DB 中 `Send=true` 且 `Used=false` 的记录
 - 功能：调用 GPT-5.1（PF-Rewrite），生成草稿，判断 TargetBlog，自动贴入对应 Blog DB，触发 PF-SEO，最后勾选 Used
 
-**Publish Runner（发布流程）**
+**Translation Runner（多语言翻译流程）**
 - 触发条件：Blog DB 中 Published 字段变为 true
-- 功能：发布简体版到 Playfish 主网站，触发多语言翻译（待实现）
+- 功能：自动翻译成多语言（EN/繁体），创建对应语言版本的 Blog 条目（待实现）
 
 ---
 
@@ -420,7 +461,7 @@ PLAYFISH_DEPLOY_WEBHOOK_URL=
 ### 触发机制
 - **Source Runner**: Webhook 或 Cron 轮询（检测新记录，自动生成 Title 和 SourceID）
 - **Draft Runner**: **用户勾选 Send 后自动触发**，检测 Source DB 中 `Send=true` 且 `Used=false` 的记录，自动生成草稿并贴入对应 Blog DB，完成后勾选 Used
-- **Publish Runner**: 检测 Blog DB 中 Published 字段变化（用户手动勾选后触发）
+- **Translation Runner**: 检测 Blog DB 中 Published 字段变化（用户手动勾选后触发），自动翻译成多语言
 
 ### OpenAI 命令集（Command Sets）
 - **PF-Rewrite**: 用于 Draft Runner，生成角度分析、大纲、草稿、思考日志
@@ -443,15 +484,17 @@ PLAYFISH_DEPLOY_WEBHOOK_URL=
 
 ### 🚀 Phase 2（立即可做）
 - 创建 autowriter 项目骨架（Next.js）✅
-- 实现 Source Runner
-- 实现 Draft Runner
-- 实现 Publish Runner
+- 实现 Source Runner ✅
+- 实现 Draft Runner ✅
+- 实现 Image Runner (DALL-E 3 + R2)
+- 实现 Translation Runner（多语言翻译）
 
 ### 🚀 Phase 3（后续增强）
-- 建 Dashboard UI（查看日志 + 手动触发）
+- 建 Dashboard UI（查看日志 + 手动触发 + 封面图生成器）
 - 文章质量评分系统
 - 自动关键词密度分析
 - 自动图片生成多版本（社媒封面）
+- 邮件通知系统（每日 Source/Draft/Cron 日志报告）
 
 ---
 

@@ -3,6 +3,7 @@ import { openai, MODELS, ChatMessage } from '@/lib/openai/client';
 import { PROMPTS } from '@/lib/openai/prompts';
 import { nanoid } from 'nanoid';
 import { BlockObjectRequest } from '@notionhq/client/build/src/api-endpoints';
+import { generateAndUploadCover } from '@/services/image-runner';
 
 const BLOG_TAGS = {
   Playfish: [
@@ -35,11 +36,15 @@ type DraftResult = {
     targetBlog: string;
     draftId: string;
     sourceId: string;
+    coverUrl?: string;
   }>;
 };
 
-export async function runDraftRunner(): Promise<DraftResult> {
+export async function runDraftRunner(options?: { limit?: number, skipImage?: boolean }): Promise<DraftResult> {
   console.log('Starting Draft Runner...');
+  
+  // Default limit is processed all, but if limit is provided (e.g. 1 for Cron), use it.
+  const { limit, skipImage } = options || {};
 
   // 1. Query Source DB for Send=true AND Used=false
   const sourceDbId = process.env.NOTION_BLOG_SOURCE_DB_ID;
@@ -63,6 +68,8 @@ export async function runDraftRunner(): Promise<DraftResult> {
         },
       ],
     },
+    // If limit is provided, we fetch a bit more just in case, but processing loop will stop
+    page_size: limit ? limit + 5 : 100,
   });
 
   const pages = response.results;
@@ -74,9 +81,15 @@ export async function runDraftRunner(): Promise<DraftResult> {
 
   let processedCount = 0;
   const errors: string[] = [];
-  const results: Array<{ title: string; targetBlog: string; draftId: string; sourceId: string }> = [];
+  const results: Array<{ title: string; targetBlog: string; draftId: string; sourceId: string; coverUrl?: string }> = [];
 
   for (const page of pages) {
+    // Enforce limit check at start of loop
+    if (limit && processedCount >= limit) {
+      console.log(`Limit of ${limit} processed items reached. Stopping.`);
+      break;
+    }
+
     const p = page as any;
     const pageId = p.id;
     const sourceTitle = p.properties.Title?.title[0]?.plain_text || 'Untitled Source';
@@ -103,9 +116,6 @@ export async function runDraftRunner(): Promise<DraftResult> {
 
       if (content.imageUrls.length > 0) {
         promptContent += `\n\n[Image Content Available: ${content.imageUrls.length} images found but not directly processed in text rewrite step unless Vision model used. For now, rely on text extraction if any.]`;
-        // Note: Ideally we would use Vision here too if the text is empty, 
-        // but for now we rely on the text content or title. 
-        // If content is empty, we might skip or use title only.
       }
 
       if (!content.text.trim() && content.imageUrls.length === 0) {
@@ -197,10 +207,6 @@ export async function runDraftRunner(): Promise<DraftResult> {
       });
 
       // 5. Determine Target Blog DB ID
-      // Map targetBlog values to Notion DB IDs:
-      // "Playfish" -> Blog-Playfish
-      // "FIRE" -> Blog-FIRE
-      // "Immigrant" -> Blog-Immigrant
       let targetDbId = process.env.NOTION_PLAYFISH_DB_ID; // Default
       
       if (targetBlog === 'FIRE') targetDbId = process.env.NOTION_FIRE_DB_ID;
@@ -267,10 +273,7 @@ export async function runDraftRunner(): Promise<DraftResult> {
       console.log(`Writing to Blog DB (${targetBlog})...`);
       
       // Need to split draft content into blocks (Notion has 2000 char limit per block)
-      // For simplicity, we'll put the whole draft in one or few paragraph blocks.
-      // Better implementation would parse Markdown to Blocks, but for now simple text.
       const blogContentBlocks: any[] = [];
-      // Reusing MAX_CHUNK_LENGTH from above
       const draftText = draftData.draft || '';
       for (let i = 0; i < draftText.length; i += MAX_CHUNK_LENGTH) {
         blogContentBlocks.push({
@@ -282,7 +285,7 @@ export async function runDraftRunner(): Promise<DraftResult> {
         });
       }
 
-      await notion.pages.create({
+      const blogPage = await notion.pages.create({
         parent: { database_id: targetDbId },
         properties: {
           Title: {
@@ -327,7 +330,7 @@ export async function runDraftRunner(): Promise<DraftResult> {
         children: blogContentBlocks as BlockObjectRequest[],
       });
 
-      // 8. Update Source DB (Mark as Used)
+      // 8. Update Source DB (Mark as Used) FIRST to prevent duplicate processing if image gen timeouts
       console.log('Updating Source DB (Used=true)...');
       await notion.pages.update({
         page_id: pageId,
@@ -338,16 +341,37 @@ export async function runDraftRunner(): Promise<DraftResult> {
         },
       });
 
+      // 9. Try Generate Cover Image (Optional, based on config)
+      let coverUrl: string | undefined;
+      if (!skipImage) {
+        console.log('Attempting to generate cover image...');
+        const imageResult = await generateAndUploadCover(
+          blogPage.id,
+          articleTitle,
+          blogTheme,
+          seoData.Keywords || ''
+        );
+        
+        if (imageResult.success) {
+          coverUrl = imageResult.url;
+          console.log('Cover image generated successfully');
+        } else {
+          console.warn('Cover image generation failed, but Draft flow continues:', imageResult.error);
+          // We do NOT fail the whole process if image fails
+        }
+      } else {
+        console.log('Skipping cover image generation as requested.');
+      }
+
       processedCount++;
       console.log('Draft Flow Completed for page ' + pageId);
       
-      // Collect result info
-      // articleTitle is already defined above
       results.push({
         title: articleTitle,
         targetBlog: targetBlog,
         draftId: draftId,
         sourceId: sourceId,
+        coverUrl: coverUrl,
       });
 
     } catch (error: any) {
@@ -362,4 +386,3 @@ export async function runDraftRunner(): Promise<DraftResult> {
     results: results.length > 0 ? results : undefined,
   };
 }
-

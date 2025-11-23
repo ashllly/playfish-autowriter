@@ -9,6 +9,15 @@ export default function DashboardPage() {
   const [draftResult, setDraftResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Cover Manager State
+  const [loadingScan, setLoadingScan] = useState(false);
+  const [scanResult, setScanResult] = useState<any>(null);
+  const [processingCovers, setProcessingCovers] = useState(false);
+  const [coverProgress, setCoverProgress] = useState({ current: 0, total: 0, success: 0, fail: 0 });
+  const [selectedDB, setSelectedDB] = useState<string>('All');
+  const [batchLimit, setBatchLimit] = useState<number>(5);
+  const [coverLogs, setCoverLogs] = useState<string[]>([]);
+
   const runSourceRunner = async () => {
     setLoadingSource(true);
     setError(null);
@@ -18,14 +27,12 @@ export default function DashboardPage() {
       const res = await fetch('/api/runner/source', { method: 'POST' });
       const data = await res.json();
       
-      // Check if response indicates quota error (402) or other errors
       if (!res.ok || !data.success) {
         if (data.code === 'insufficient_quota' || res.status === 402) {
           setError(`⚠️ ${data.error || 'OpenAI API 配额不足'}\n\n${data.errorDetails || '请检查你的 OpenAI 账户余额和账单设置。'}`);
         } else {
           setError(data.error || data.message || `HTTP Error: ${res.status}`);
         }
-        // Still set result to show partial data if available
         if (data.data) {
           setSourceResult(data);
         }
@@ -67,6 +74,83 @@ export default function DashboardPage() {
     } finally {
       setLoadingDraft(false);
     }
+  };
+
+  const runScan = async () => {
+    setLoadingScan(true);
+    setScanResult(null);
+    setCoverLogs([]);
+    setError(null);
+    try {
+      const res = await fetch('/api/runner/cover-manager');
+      const data = await res.json();
+      if (data.success) {
+        setScanResult(data.data);
+      } else {
+        setError(data.error || 'Scan failed');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Scan failed');
+    } finally {
+      setLoadingScan(false);
+    }
+  };
+
+  const runCoverProcess = async () => {
+    if (!scanResult) return;
+
+    setProcessingCovers(true);
+    setCoverLogs([]);
+    
+    // 1. Flatten and filter items
+    let items: any[] = [];
+    if (selectedDB === 'All') {
+      items = [...scanResult.Playfish, ...scanResult.FIRE, ...scanResult.Immigrant];
+    } else {
+      items = scanResult[selectedDB] || [];
+    }
+
+    // 2. Limit items
+    const tasks = items.slice(0, batchLimit);
+    
+    setCoverProgress({ current: 0, total: tasks.length, success: 0, fail: 0 });
+
+    // 3. Process loop
+    for (let i = 0; i < tasks.length; i++) {
+      const task = tasks[i];
+      setCoverProgress(prev => ({ ...prev, current: i + 1 }));
+      setCoverLogs(prev => [`Processing [${i + 1}/${tasks.length}]: ${task.title}...`, ...prev]);
+
+      try {
+        const res = await fetch('/api/runner/cover-manager', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pageId: task.id,
+            title: task.title,
+            blogTheme: task.theme,
+            keywords: task.keywords
+          })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          setCoverProgress(prev => ({ ...prev, success: prev.success + 1 }));
+          setCoverLogs(prev => [`✅ Success: ${task.title}`, ...prev]);
+        } else {
+          setCoverProgress(prev => ({ ...prev, fail: prev.fail + 1 }));
+          setCoverLogs(prev => [`❌ Failed: ${task.title} - ${data.error}`, ...prev]);
+        }
+      } catch (err: any) {
+        setCoverProgress(prev => ({ ...prev, fail: prev.fail + 1 }));
+        setCoverLogs(prev => [`❌ Error: ${task.title} - ${err.message}`, ...prev]);
+      }
+    }
+
+    setProcessingCovers(false);
+    setCoverLogs(prev => [`🎉 Batch Completed!`, ...prev]);
+    // Optionally re-scan to update list
+    runScan();
   };
 
   return (
@@ -118,11 +202,9 @@ export default function DashboardPage() {
                    Stage 1
                  </span>
               </div>
-              
               <div className="mt-2 max-w-xl text-sm text-gray-500">
                 <p>Scans Source DB for new entries without Title/ID and auto-generates them.</p>
               </div>
-              
               <div className="mt-5">
                 <button
                   onClick={runSourceRunner}
@@ -131,48 +213,15 @@ export default function DashboardPage() {
                   className={`inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white 
                     ${loadingSource ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'}`}
                 >
-                  {loadingSource ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Running...
-                    </>
-                  ) : 'Trigger Manually'}
+                  {loadingSource ? 'Running...' : 'Trigger Manually'}
                 </button>
               </div>
-
-              {/* Source Result Display */}
+              {/* Result Display logic ... */}
               {sourceResult && (
-                <div className={`mt-4 rounded-md p-3 border ${
-                  sourceResult.warning 
-                    ? 'bg-yellow-50 border-yellow-200' 
-                    : 'bg-green-50 border-green-100'
-                }`}>
-                  <p className={`text-sm font-medium ${
-                    sourceResult.warning ? 'text-yellow-800' : 'text-green-800'
-                  }`}>
+                <div className={`mt-4 rounded-md p-3 border ${sourceResult.warning ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-100'}`}>
+                  <p className={`text-sm font-medium ${sourceResult.warning ? 'text-yellow-800' : 'text-green-800'}`}>
                     {sourceResult.warning ? '⚠️ Warning' : '✅ Success'}: {sourceResult.message}
                   </p>
-                  {sourceResult.data && (
-                    <div className="mt-2">
-                      <p className="text-xs font-semibold text-gray-600 mb-1">处理结果:</p>
-                      <pre className="text-xs text-gray-700 overflow-x-auto">
-                        {JSON.stringify(sourceResult.data, null, 2)}
-                      </pre>
-                    </div>
-                  )}
-                  {sourceResult.data?.errors && sourceResult.data.errors.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-yellow-200">
-                      <p className="text-xs font-semibold text-yellow-700 mb-1">错误详情:</p>
-                      <ul className="text-xs text-yellow-700 list-disc list-inside">
-                        {sourceResult.data.errors.map((err: string, idx: number) => (
-                          <li key={idx}>{err}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -190,7 +239,7 @@ export default function DashboardPage() {
                  </span>
               </div>
               <div className="mt-2 max-w-xl text-sm text-gray-500">
-                <p>Generates full drafts for sources marked as "Send" (and not "Used").</p>
+                <p>Generates full drafts for sources marked as "Send".</p>
               </div>
               <div className="mt-5">
                 <button
@@ -200,66 +249,145 @@ export default function DashboardPage() {
                   className={`inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white 
                     ${loadingDraft ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'}`}
                 >
-                  {loadingDraft ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Running...
-                    </>
-                  ) : 'Trigger Manually'}
+                  {loadingDraft ? 'Running...' : 'Trigger Manually'}
+                </button>
+              </div>
+              {/* Draft Result Display */}
+              {draftResult && (
+                <div className={`mt-4 rounded-md p-3 border ${draftResult.warning ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-100'}`}>
+                  <p className={`text-sm font-medium ${draftResult.warning ? 'text-yellow-800' : 'text-green-800'}`}>
+                    {draftResult.warning ? '⚠️ Warning' : '✅ Success'}: {draftResult.message}
+                  </p>
+                  {/* Detailed results map... */}
+                  {draftResult.data?.results?.map((item: any, idx: number) => (
+                    <div key={idx} className="mt-2 p-2 bg-white rounded border text-xs">
+                      <p className="font-medium">{item.title}</p>
+                      <p className="text-gray-500">{item.targetBlog} | DraftID: {item.draftId}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Cover Image Manager Card (New) */}
+          <div className="bg-white overflow-hidden shadow rounded-lg border border-gray-100 md:col-span-2">
+            <div className="px-4 py-5 sm:p-6">
+              <div className="flex items-center justify-between mb-4">
+                 <h3 className="text-lg leading-6 font-medium text-gray-900">
+                  Cover Image Manager
+                 </h3>
+                 <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                   Stage 3 (Optional)
+                 </span>
+              </div>
+              <div className="mt-2 max-w-xl text-sm text-gray-500">
+                <p>Scan for articles missing cover images and batch generate them using DALL-E 3.</p>
+              </div>
+              
+              <div className="mt-5 flex items-center gap-4">
+                <button
+                  onClick={runScan}
+                  disabled={loadingScan || processingCovers}
+                  type="button"
+                  className={`inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 
+                    ${loadingScan ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {loadingScan ? 'Scanning...' : 'Scan Missing Covers'}
                 </button>
               </div>
 
-              {/* Draft Result Display */}
-              {draftResult && (
-                <div className={`mt-4 rounded-md p-3 border ${
-                  draftResult.warning || (draftResult.data?.errors && draftResult.data.errors.length > 0)
-                    ? 'bg-yellow-50 border-yellow-200' 
-                    : 'bg-green-50 border-green-100'
-                }`}>
-                  <p className={`text-sm font-medium ${
-                    draftResult.warning || (draftResult.data?.errors && draftResult.data.errors.length > 0) ? 'text-yellow-800' : 'text-green-800'
-                  }`}>
-                    {draftResult.warning ? '⚠️ Warning' : '✅ Success'}: {draftResult.message}
-                  </p>
-                  
-                  {/* Display detailed results */}
-                  {draftResult.data?.results && draftResult.data.results.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-green-200">
-                      <p className="text-xs font-semibold text-gray-700 mb-2">生成的文章：</p>
-                      {draftResult.data.results.map((item: any, idx: number) => (
-                        <div key={idx} className="mb-2 p-2 bg-white rounded border border-gray-200">
-                          <p className="text-xs font-medium text-gray-900">{item.title}</p>
-                          <div className="mt-1 flex items-center gap-3 text-xs text-gray-600">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800">
-                              {item.targetBlog}
-                            </span>
-                            <span className="text-gray-500">Draft ID: <code className="text-xs">{item.draftId}</code></span>
-                            <span className="text-gray-500">Source ID: <code className="text-xs">{item.sourceId}</code></span>
+              {scanResult && (
+                <div className="mt-6 border-t border-gray-100 pt-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                    <div className="bg-blue-50 p-3 rounded-lg text-center">
+                      <div className="text-sm font-medium text-blue-900">Playfish</div>
+                      <div className="text-2xl font-bold text-blue-600">{scanResult.Playfish.length}</div>
+                      <div className="text-xs text-blue-500">Missing</div>
+                    </div>
+                    <div className="bg-red-50 p-3 rounded-lg text-center">
+                      <div className="text-sm font-medium text-red-900">FIRE</div>
+                      <div className="text-2xl font-bold text-red-600">{scanResult.FIRE.length}</div>
+                      <div className="text-xs text-red-500">Missing</div>
+                    </div>
+                    <div className="bg-purple-50 p-3 rounded-lg text-center">
+                      <div className="text-sm font-medium text-purple-900">Immigrant</div>
+                      <div className="text-2xl font-bold text-purple-600">{scanResult.Immigrant.length}</div>
+                      <div className="text-xs text-purple-500">Missing</div>
+                    </div>
+                  </div>
+
+                  {scanResult.total > 0 && (
+                    <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
+                      <h4 className="text-sm font-medium text-gray-900 mb-4">Batch Processing Config</h4>
+                      <div className="flex flex-col sm:flex-row gap-4 items-end">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Target Database</label>
+                          <select 
+                            value={selectedDB} 
+                            onChange={(e) => setSelectedDB(e.target.value)}
+                            disabled={processingCovers}
+                            className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm rounded-md"
+                          >
+                            <option value="All">All Databases</option>
+                            <option value="Playfish">Playfish Only</option>
+                            <option value="FIRE">FIRE Only</option>
+                            <option value="Immigrant">Immigrant Only</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Batch Limit</label>
+                          <select 
+                            value={batchLimit} 
+                            onChange={(e) => setBatchLimit(Number(e.target.value))}
+                            disabled={processingCovers}
+                            className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm rounded-md"
+                          >
+                            <option value={1}>1 Image</option>
+                            <option value={3}>3 Images</option>
+                            <option value={5}>5 Images</option>
+                            <option value={10}>10 Images</option>
+                          </select>
+                        </div>
+                        <button
+                          onClick={runCoverProcess}
+                          disabled={processingCovers}
+                          type="button"
+                          className={`inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white 
+                            ${processingCovers ? 'bg-purple-400 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'}`}
+                        >
+                          {processingCovers ? 'Processing...' : 'Generate Covers'}
+                        </button>
+                      </div>
+
+                      {processingCovers && (
+                        <div className="mt-4">
+                          <div className="flex justify-between text-xs text-gray-500 mb-1">
+                            <span>Progress: {coverProgress.current} / {coverProgress.total}</span>
+                            <span>Success: {coverProgress.success} | Failed: {coverProgress.fail}</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2.5">
+                            <div 
+                              className="bg-purple-600 h-2.5 rounded-full transition-all duration-300" 
+                              style={{ width: `${(coverProgress.current / coverProgress.total) * 100}%` }}
+                            ></div>
                           </div>
                         </div>
-                      ))}
+                      )}
+
+                      {coverLogs.length > 0 && (
+                        <div className="mt-4 bg-black bg-opacity-90 rounded p-3 h-40 overflow-y-auto text-xs font-mono text-green-400">
+                          {coverLogs.map((log, i) => (
+                            <div key={i} className="mb-1 border-b border-gray-800 pb-1 last:border-0">{log}</div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                   
-                  {draftResult.data && (
-                    <div className="mt-2">
-                      <p className="text-xs font-semibold text-gray-600 mb-1">处理结果:</p>
-                      <pre className="text-xs text-gray-700 overflow-x-auto">
-                        {JSON.stringify(draftResult.data, null, 2)}
-                      </pre>
-                    </div>
-                  )}
-                  {draftResult.data?.errors && draftResult.data.errors.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-yellow-200">
-                      <p className="text-xs font-semibold text-yellow-700 mb-1">错误详情:</p>
-                      <ul className="text-xs text-yellow-700 list-disc list-inside">
-                        {draftResult.data.errors.map((err: string, idx: number) => (
-                          <li key={idx}>{err}</li>
-                        ))}
-                      </ul>
+                  {scanResult.total === 0 && (
+                    <div className="text-center py-4 text-sm text-gray-500">
+                      🎉 No missing covers found!
                     </div>
                   )}
                 </div>

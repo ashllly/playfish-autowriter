@@ -48,7 +48,16 @@ export async function POST(request: Request) {
 
   try {
     console.log('Manual Draft Runner triggered');
-    const result = await runDraftRunner();
+    
+    // Parse query params for options
+    const { searchParams } = new URL(request.url);
+    const limitParam = searchParams.get('limit');
+    const skipImageParam = searchParams.get('skipImage');
+
+    const limit = limitParam ? parseInt(limitParam) : undefined;
+    const skipImage = skipImageParam === 'true';
+
+    const result = await runDraftRunner({ limit, skipImage });
     
     if (result.errors && result.processed === 0) {
       return NextResponse.json({ 
