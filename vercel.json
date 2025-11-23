@@ -1,0 +1,13 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/source-runner",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/draft-runner",
+      "schedule": "*/30 * * * *"
+    }
+  ]
+}
+
