@@ -24,6 +24,14 @@ export default function DashboardPage() {
     error?: string;
   }>>([]);
 
+  // Translation Manager State
+  const [loadingTranslationScan, setLoadingTranslationScan] = useState(false);
+  const [translationScanResult, setTranslationScanResult] = useState<any>(null);
+  const [processingTranslations, setProcessingTranslations] = useState(false);
+  const [translationProgress, setTranslationProgress] = useState({ current: 0, total: 0, success: 0, fail: 0 });
+  const [translationResults, setTranslationResults] = useState<any[]>([]);
+  const [translationLogs, setTranslationLogs] = useState<string[]>([]);
+
   const runSourceRunner = async () => {
     setLoadingSource(true);
     setError(null);
@@ -164,6 +172,95 @@ export default function DashboardPage() {
     runScan();
   };
 
+  // Translation Functions
+  const runTranslationScan = async () => {
+    setLoadingTranslationScan(true);
+    setTranslationScanResult(null);
+    setTranslationLogs([]);
+    setTranslationResults([]);
+    setError(null);
+    try {
+      const res = await fetch('/api/runner/translation-manager');
+      const data = await res.json();
+      if (data.success) {
+        setTranslationScanResult(data.data);
+      } else {
+        setError(data.error || 'Scan failed');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Scan failed');
+    } finally {
+      setLoadingTranslationScan(false);
+    }
+  };
+
+  const runTranslationProcess = async (targetLang: 'en' | 'zh-hant' | 'all') => {
+    if (!translationScanResult) return;
+
+    setProcessingTranslations(true);
+    setTranslationLogs([]);
+    setTranslationResults([]);
+
+    const tasks = translationScanResult; // Process all found tasks (usually limited by scan)
+    
+    // Calculate total operations (some tasks might need 2 translations)
+    let totalOps = 0;
+    tasks.forEach((t: any) => {
+      if (targetLang === 'all') totalOps += t.missingLangs.length;
+      else if (t.missingLangs.includes(targetLang)) totalOps += 1;
+    });
+
+    setTranslationProgress({ current: 0, total: totalOps, success: 0, fail: 0 });
+
+    let currentOp = 0;
+
+    for (const task of tasks) {
+      const langsToProcess = [];
+      if (targetLang === 'all') {
+        langsToProcess.push(...task.missingLangs);
+      } else if (task.missingLangs.includes(targetLang)) {
+        langsToProcess.push(targetLang);
+      }
+
+      for (const lang of langsToProcess) {
+        currentOp++;
+        setTranslationProgress(prev => ({ ...prev, current: currentOp }));
+        setTranslationLogs(prev => [`Translating [${currentOp}/${totalOps}]: ${task.title} -> ${lang}...`, ...prev]);
+
+        try {
+          const res = await fetch('/api/runner/translation-manager', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sourcePageId: task.sourcePageId,
+              targetLang: lang,
+              blogTheme: task.blogTheme
+            })
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            setTranslationProgress(prev => ({ ...prev, success: prev.success + 1 }));
+            setTranslationLogs(prev => [`✅ Success: ${task.title} (${lang})`, ...prev]);
+            setTranslationResults(prev => [{ title: task.title, lang: lang, url: data.data.url }, ...prev]);
+          } else {
+            setTranslationProgress(prev => ({ ...prev, fail: prev.fail + 1 }));
+            setTranslationLogs(prev => [`❌ Failed: ${task.title} (${lang}) - ${data.error}`, ...prev]);
+            setTranslationResults(prev => [{ title: task.title, lang: lang, error: data.error }, ...prev]);
+          }
+        } catch (err: any) {
+          setTranslationProgress(prev => ({ ...prev, fail: prev.fail + 1 }));
+          setTranslationLogs(prev => [`❌ Error: ${task.title} (${lang}) - ${err.message}`, ...prev]);
+          setTranslationResults(prev => [{ title: task.title, lang: lang, error: err.message }, ...prev]);
+        }
+      }
+    }
+
+    setProcessingTranslations(false);
+    setTranslationLogs(prev => [`🎉 Translation Batch Completed!`, ...prev]);
+    runTranslationScan(); // Refresh list
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-8 font-sans text-gray-900">
       <div className="max-w-4xl mx-auto">
@@ -299,19 +396,19 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Cover Image Manager Card (New) */}
-          <div className="bg-white overflow-hidden shadow rounded-lg border border-gray-100 md:col-span-2">
+          {/* Cover Image Manager Card */}
+          <div className="bg-white overflow-hidden shadow rounded-lg border border-gray-100">
             <div className="px-4 py-5 sm:p-6">
               <div className="flex items-center justify-between mb-4">
                  <h3 className="text-lg leading-6 font-medium text-gray-900">
                   Cover Image Manager
                  </h3>
                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
-                   Stage 3 (Optional)
+                   Stage 3 (Opt)
                  </span>
               </div>
               <div className="mt-2 max-w-xl text-sm text-gray-500">
-                <p>Scan for articles missing cover images and batch generate them using DALL-E 3.</p>
+                <p>Batch generate cover images.</p>
               </div>
               
               <div className="mt-5 flex items-center gap-4">
@@ -319,132 +416,226 @@ export default function DashboardPage() {
                   onClick={runScan}
                   disabled={loadingScan || processingCovers}
                   type="button"
-                  className={`inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 
+                  className={`inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 
                     ${loadingScan ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
-                  {loadingScan ? 'Scanning...' : 'Scan Missing Covers'}
+                  {loadingScan ? 'Scanning...' : 'Scan Missing'}
                 </button>
               </div>
 
               {scanResult && (
-                <div className="mt-6 border-t border-gray-100 pt-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                    <div className="bg-blue-50 p-3 rounded-lg text-center">
-                      <div className="text-sm font-medium text-blue-900">Playfish</div>
-                      <div className="text-2xl font-bold text-blue-600">{scanResult.Playfish.length}</div>
-                      <div className="text-xs text-blue-500">Missing</div>
+                <div className="mt-4 border-t border-gray-100 pt-4">
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    <div className="bg-blue-50 p-2 rounded text-center">
+                      <div className="text-xs text-blue-900">Playfish</div>
+                      <div className="text-lg font-bold text-blue-600">{scanResult.Playfish.length}</div>
                     </div>
-                    <div className="bg-red-50 p-3 rounded-lg text-center">
-                      <div className="text-sm font-medium text-red-900">FIRE</div>
-                      <div className="text-2xl font-bold text-red-600">{scanResult.FIRE.length}</div>
-                      <div className="text-xs text-red-500">Missing</div>
+                    <div className="bg-red-50 p-2 rounded text-center">
+                      <div className="text-xs text-red-900">FIRE</div>
+                      <div className="text-lg font-bold text-red-600">{scanResult.FIRE.length}</div>
                     </div>
-                    <div className="bg-purple-50 p-3 rounded-lg text-center">
-                      <div className="text-sm font-medium text-purple-900">Immigrant</div>
-                      <div className="text-2xl font-bold text-purple-600">{scanResult.Immigrant.length}</div>
-                      <div className="text-xs text-purple-500">Missing</div>
+                    <div className="bg-purple-50 p-2 rounded text-center">
+                      <div className="text-xs text-purple-900">Immigrant</div>
+                      <div className="text-lg font-bold text-purple-600">{scanResult.Immigrant.length}</div>
                     </div>
                   </div>
 
                   {scanResult.total > 0 && (
-                    <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
-                      <h4 className="text-sm font-medium text-gray-900 mb-4">Batch Processing Config</h4>
-                      <div className="flex flex-col sm:flex-row gap-4 items-end">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Target Database</label>
-                          <select 
-                            value={selectedDB} 
-                            onChange={(e) => setSelectedDB(e.target.value)}
-                            disabled={processingCovers}
-                            className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm rounded-md"
-                          >
-                            <option value="All">All Databases</option>
-                            <option value="Playfish">Playfish Only</option>
-                            <option value="FIRE">FIRE Only</option>
-                            <option value="Immigrant">Immigrant Only</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Batch Limit</label>
-                          <select 
-                            value={batchLimit} 
-                            onChange={(e) => setBatchLimit(Number(e.target.value))}
-                            disabled={processingCovers}
-                            className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm rounded-md"
-                          >
-                            <option value={1}>1 Image</option>
-                            <option value={3}>3 Images</option>
-                            <option value={5}>5 Images</option>
-                            <option value={10}>10 Images</option>
-                          </select>
-                        </div>
+                    <div className="bg-gray-50 p-3 rounded-md border border-gray-200">
+                      <div className="flex flex-col gap-3">
+                        <select 
+                          value={selectedDB} 
+                          onChange={(e) => setSelectedDB(e.target.value)}
+                          disabled={processingCovers}
+                          className="block w-full text-sm border-gray-300 rounded-md"
+                        >
+                          <option value="All">All Databases</option>
+                          <option value="Playfish">Playfish Only</option>
+                          <option value="FIRE">FIRE Only</option>
+                          <option value="Immigrant">Immigrant Only</option>
+                        </select>
+                        <select 
+                          value={batchLimit} 
+                          onChange={(e) => setBatchLimit(Number(e.target.value))}
+                          disabled={processingCovers}
+                          className="block w-full text-sm border-gray-300 rounded-md"
+                        >
+                          <option value={1}>1 Image</option>
+                          <option value={3}>3 Images</option>
+                          <option value={5}>5 Images</option>
+                        </select>
                         <button
                           onClick={runCoverProcess}
                           disabled={processingCovers}
                           type="button"
-                          className={`inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white 
-                            ${processingCovers ? 'bg-purple-400 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'}`}
+                          className={`w-full inline-flex justify-center items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white 
+                            ${processingCovers ? 'bg-purple-400' : 'bg-purple-600 hover:bg-purple-700'}`}
                         >
                           {processingCovers ? 'Processing...' : 'Generate Covers'}
                         </button>
                       </div>
 
                       {processingCovers && (
-                        <div className="mt-4">
-                          <div className="flex justify-between text-xs text-gray-500 mb-1">
-                            <span>Progress: {coverProgress.current} / {coverProgress.total}</span>
-                            <span>Success: {coverProgress.success} | Failed: {coverProgress.fail}</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2.5">
+                        <div className="mt-3">
+                          <div className="w-full bg-gray-200 rounded-full h-2">
                             <div 
-                              className="bg-purple-600 h-2.5 rounded-full transition-all duration-300" 
+                              className="bg-purple-600 h-2 rounded-full transition-all duration-300" 
                               style={{ width: `${(coverProgress.current / coverProgress.total) * 100}%` }}
                             ></div>
                           </div>
+                          <p className="text-xs text-center mt-1 text-gray-500">{coverProgress.current} / {coverProgress.total}</p>
                         </div>
                       )}
 
-                      {/* Detailed Results (New Section) */}
+                      {/* Results */}
                       {coverResults.length > 0 && (
-                        <div className="mt-4 border-t border-gray-200 pt-3">
-                          <h4 className="text-xs font-bold text-gray-700 mb-2">Processing Results</h4>
-                          <div className="space-y-2">
+                        <div className="mt-3 border-t border-gray-200 pt-2">
+                          <div className="space-y-1 max-h-32 overflow-y-auto">
                             {coverResults.map((result, idx) => (
-                              <div key={idx} className={`p-2 rounded border text-xs flex justify-between items-center ${
-                                result.error ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'
-                              }`}>
-                                <div>
-                                  <span className="font-medium text-gray-900">{result.title}</span>
-                                  <span className="ml-2 px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[10px]">{result.theme}</span>
-                                </div>
-                                <div className="ml-4 flex-shrink-0">
-                                  {result.url ? (
-                                    <a href={result.url} target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">
-                                      View Image ↗
-                                    </a>
-                                  ) : (
-                                    <span className="text-red-600 font-medium">{result.error || 'Failed'}</span>
-                                  )}
-                                </div>
+                              <div key={idx} className={`p-1.5 rounded border text-[10px] flex justify-between ${result.error ? 'bg-red-50' : 'bg-green-50'}`}>
+                                <span className="truncate w-2/3">{result.title}</span>
+                                {result.url ? <a href={result.url} target="_blank" className="text-purple-600">View</a> : <span className="text-red-500">Fail</span>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Logs */}
+                      {coverLogs.length > 0 && (
+                        <div className="mt-2 bg-black bg-opacity-90 rounded p-2 h-24 overflow-y-auto text-[10px] font-mono text-green-400">
+                          {coverLogs.map((log, i) => (
+                            <div key={i} className="border-b border-gray-800 pb-0.5 mb-0.5">{log}</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Translation Manager Card (New) */}
+          <div className="bg-white overflow-hidden shadow rounded-lg border border-gray-100">
+            <div className="px-4 py-5 sm:p-6">
+              <div className="flex items-center justify-between mb-4">
+                 <h3 className="text-lg leading-6 font-medium text-gray-900">
+                  Translation Manager
+                 </h3>
+                 <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-teal-100 text-teal-800">
+                   Stage 4 (Final)
+                 </span>
+              </div>
+              <div className="mt-2 max-w-xl text-sm text-gray-500">
+                <p>Translate published articles to English and Traditional Chinese.</p>
+              </div>
+              
+              <div className="mt-5 flex items-center gap-4">
+                <button
+                  onClick={runTranslationScan}
+                  disabled={loadingTranslationScan || processingTranslations}
+                  type="button"
+                  className={`inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 
+                    ${loadingTranslationScan ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {loadingTranslationScan ? 'Scanning...' : 'Scan Untranslated'}
+                </button>
+              </div>
+
+              {translationScanResult && (
+                <div className="mt-4 border-t border-gray-100 pt-4">
+                  <div className="mb-4 flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">Found {translationScanResult.length} pending articles</span>
+                  </div>
+
+                  {translationScanResult.length > 0 && (
+                    <div className="bg-gray-50 p-3 rounded-md border border-gray-200">
+                      <div className="grid grid-cols-1 gap-2 mb-3 max-h-40 overflow-y-auto">
+                        {translationScanResult.map((task: any, idx: number) => (
+                          <div key={idx} className="bg-white p-2 rounded border text-xs flex justify-between items-center">
+                            <div className="flex flex-col">
+                              <span className="font-medium truncate max-w-[150px]">{task.title}</span>
+                              <span className="text-[10px] text-gray-500">{task.blogTheme}</span>
+                            </div>
+                            <div className="flex gap-1">
+                              {task.missingLangs.includes('en') && <span className="px-1.5 py-0.5 bg-orange-100 text-orange-800 rounded text-[10px]">No EN</span>}
+                              {task.missingLangs.includes('zh-hant') && <span className="px-1.5 py-0.5 bg-orange-100 text-orange-800 rounded text-[10px]">No ZHT</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => runTranslationProcess('en')}
+                          disabled={processingTranslations}
+                          type="button"
+                          className={`flex-1 inline-flex justify-center items-center px-2 py-2 border border-transparent shadow-sm text-xs font-medium rounded-md text-white 
+                            ${processingTranslations ? 'bg-teal-400' : 'bg-teal-600 hover:bg-teal-700'}`}
+                        >
+                          Translate EN
+                        </button>
+                        <button
+                          onClick={() => runTranslationProcess('zh-hant')}
+                          disabled={processingTranslations}
+                          type="button"
+                          className={`flex-1 inline-flex justify-center items-center px-2 py-2 border border-transparent shadow-sm text-xs font-medium rounded-md text-white 
+                            ${processingTranslations ? 'bg-teal-400' : 'bg-teal-600 hover:bg-teal-700'}`}
+                        >
+                          Translate ZHT
+                        </button>
+                        <button
+                          onClick={() => runTranslationProcess('all')}
+                          disabled={processingTranslations}
+                          type="button"
+                          className={`flex-1 inline-flex justify-center items-center px-2 py-2 border border-transparent shadow-sm text-xs font-medium rounded-md text-white 
+                            ${processingTranslations ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'}`}
+                        >
+                          Translate ALL
+                        </button>
+                      </div>
+
+                      {processingTranslations && (
+                        <div className="mt-3">
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-teal-600 h-2 rounded-full transition-all duration-300" 
+                              style={{ width: `${(translationProgress.current / translationProgress.total) * 100}%` }}
+                            ></div>
+                          </div>
+                          <p className="text-xs text-center mt-1 text-gray-500">{translationProgress.current} / {translationProgress.total}</p>
+                        </div>
+                      )}
+
+                      {/* Results */}
+                      {translationResults.length > 0 && (
+                        <div className="mt-3 border-t border-gray-200 pt-2">
+                          <div className="space-y-1 max-h-32 overflow-y-auto">
+                            {translationResults.map((result, idx) => (
+                              <div key={idx} className={`p-1.5 rounded border text-[10px] flex justify-between ${result.error ? 'bg-red-50' : 'bg-green-50'}`}>
+                                <span className="truncate w-2/3">{result.title} ({result.lang})</span>
+                                {result.url ? <a href={result.url} target="_blank" className="text-teal-600">View</a> : <span className="text-red-500">Fail</span>}
                               </div>
                             ))}
                           </div>
                         </div>
                       )}
 
-                      {coverLogs.length > 0 && (
-                        <div className="mt-4 bg-black bg-opacity-90 rounded p-3 h-40 overflow-y-auto text-xs font-mono text-green-400">
-                          {coverLogs.map((log, i) => (
-                            <div key={i} className="mb-1 border-b border-gray-800 pb-1 last:border-0">{log}</div>
+                      {/* Logs */}
+                      {translationLogs.length > 0 && (
+                        <div className="mt-2 bg-black bg-opacity-90 rounded p-2 h-24 overflow-y-auto text-[10px] font-mono text-green-400">
+                          {translationLogs.map((log, i) => (
+                            <div key={i} className="border-b border-gray-800 pb-0.5 mb-0.5">{log}</div>
                           ))}
                         </div>
                       )}
                     </div>
                   )}
                   
-                  {scanResult.total === 0 && (
+                  {translationScanResult.length === 0 && (
                     <div className="text-center py-4 text-sm text-gray-500">
-                      🎉 No missing covers found!
+                      🎉 All articles translated!
                     </div>
                   )}
                 </div>
