@@ -14,12 +14,22 @@ export default function DashboardPage() {
     
     try {
       const res = await fetch('/api/runner/source', { method: 'POST' });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTP Error: ${res.status}`);
-      }
       const data = await res.json();
-      setSourceResult(data);
+      
+      // Check if response indicates quota error (402) or other errors
+      if (!res.ok || !data.success) {
+        if (data.code === 'insufficient_quota' || res.status === 402) {
+          setError(`⚠️ ${data.error || 'OpenAI API 配额不足'}\n\n${data.errorDetails || '请检查你的 OpenAI 账户余额和账单设置。'}`);
+        } else {
+          setError(data.error || data.message || `HTTP Error: ${res.status}`);
+        }
+        // Still set result to show partial data if available
+        if (data.data) {
+          setSourceResult(data);
+        }
+      } else {
+        setSourceResult(data);
+      }
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Unknown error occurred');
@@ -45,10 +55,20 @@ export default function DashboardPage() {
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
               </div>
-              <div className="ml-3">
-                <p className="text-sm text-red-700">
+              <div className="ml-3 flex-1">
+                <p className="text-sm text-red-700 whitespace-pre-line">
                   {error}
                 </p>
+                {error.includes('配额') && (
+                  <a 
+                    href="https://platform.openai.com/account/billing" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-block text-sm text-red-600 underline hover:text-red-800"
+                  >
+                    前往 OpenAI 账单页面 →
+                  </a>
+                )}
               </div>
             </div>
           </div>
@@ -94,14 +114,33 @@ export default function DashboardPage() {
 
               {/* Result Display */}
               {sourceResult && (
-                <div className="mt-4 bg-green-50 rounded-md p-3 border border-green-100">
-                  <p className="text-sm font-medium text-green-800">
-                    Success: {sourceResult.message}
+                <div className={`mt-4 rounded-md p-3 border ${
+                  sourceResult.warning 
+                    ? 'bg-yellow-50 border-yellow-200' 
+                    : 'bg-green-50 border-green-100'
+                }`}>
+                  <p className={`text-sm font-medium ${
+                    sourceResult.warning ? 'text-yellow-800' : 'text-green-800'
+                  }`}>
+                    {sourceResult.warning ? '⚠️ Warning' : '✅ Success'}: {sourceResult.message}
                   </p>
                   {sourceResult.data && (
-                     <pre className="mt-2 text-xs text-green-700 overflow-x-auto">
-                       {JSON.stringify(sourceResult.data, null, 2)}
-                     </pre>
+                    <div className="mt-2">
+                      <p className="text-xs font-semibold text-gray-600 mb-1">处理结果:</p>
+                      <pre className="text-xs text-gray-700 overflow-x-auto">
+                        {JSON.stringify(sourceResult.data, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                  {sourceResult.data?.errors && sourceResult.data.errors.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-yellow-200">
+                      <p className="text-xs font-semibold text-yellow-700 mb-1">错误详情:</p>
+                      <ul className="text-xs text-yellow-700 list-disc list-inside">
+                        {sourceResult.data.errors.map((err: string, idx: number) => (
+                          <li key={idx}>{err}</li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                 </div>
               )}

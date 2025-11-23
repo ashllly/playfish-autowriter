@@ -38,6 +38,8 @@ export async function runSourceRunner() {
   }
 
   let processedCount = 0;
+  let quotaError = false;
+  const errors: string[] = [];
 
   for (const page of pages) {
     const p = page as any;
@@ -179,9 +181,36 @@ export async function runSourceRunner() {
         processedCount++;
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Failed to process page ${page.id}:`, error);
+      
+      // Check if it's an OpenAI quota error
+      if (error?.code === 'insufficient_quota' || error?.status === 429) {
+        quotaError = true;
+        errors.push(`页面 ${page.id}: OpenAI API 配额不足`);
+      } else {
+        errors.push(`页面 ${page.id}: ${error?.message || '未知错误'}`);
+      }
     }
+  }
+
+  // If quota error occurred, return special error info
+  if (quotaError) {
+    return { 
+      processed: processedCount,
+      error: 'OpenAI API 配额不足',
+      errorDetails: '请检查你的 OpenAI 账户余额和账单设置。访问 https://platform.openai.com/account/billing 查看详情。',
+      errors: errors
+    };
+  }
+
+  // If there were other errors but not quota, still return with warnings
+  if (errors.length > 0 && processedCount === 0) {
+    return {
+      processed: 0,
+      warning: '处理过程中遇到错误',
+      errors: errors
+    };
   }
 
   return { processed: processedCount };

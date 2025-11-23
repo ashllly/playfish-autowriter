@@ -46,6 +46,25 @@ export async function POST(request: Request) {
     console.log('Manual Source Runner triggered');
     const result = await runSourceRunner();
     
+    // Check if result contains error info (quota error, etc.)
+    if (result.error) {
+      return NextResponse.json({ 
+        success: false, 
+        message: result.error,
+        errorDetails: result.errorDetails,
+        data: result 
+      }, { status: 402 }); // 402 Payment Required
+    }
+    
+    if (result.warning) {
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Source Runner completed with warnings',
+        warning: result.warning,
+        data: result 
+      });
+    }
+    
     return NextResponse.json({ 
       success: true, 
       message: 'Source Runner executed successfully',
@@ -53,6 +72,17 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error('Source Runner Failed:', error);
+    
+    // Check for OpenAI quota errors in catch block too
+    if (error?.code === 'insufficient_quota' || error?.status === 429) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'OpenAI API 配额不足',
+        errorDetails: '请检查你的 OpenAI 账户余额和账单设置。访问 https://platform.openai.com/account/billing 查看详情。',
+        code: 'insufficient_quota'
+      }, { status: 402 });
+    }
+    
     return NextResponse.json({ 
       success: false, 
       error: error?.message || 'Internal Server Error',
