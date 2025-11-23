@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export default function Home() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 text-white font-sans">
@@ -6,7 +8,11 @@ export default function Home() {
         如果你能看到这一页，说明本地开发服务器已正常运行。
       </p>
       <p className="text-sm text-slate-500 mt-6">
-        接下来可以访问 <span className="text-slate-200 font-medium">/dashboard</span> 体验实际功能。
+        接下来可以访问{' '}
+        <Link href="/dashboard" className="text-slate-200 font-medium underline hover:text-white transition-colors">
+          /dashboard
+        </Link>{' '}
+        体验实际功能。
       </p>
     </div>
   );
