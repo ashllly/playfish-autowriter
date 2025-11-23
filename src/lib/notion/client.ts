@@ -10,11 +10,11 @@ export const notion = new Client({
 
 // Database IDs helper
 export const DB_IDS = {
-  SOURCE: process.env.NOTION_SOURCE_DB_ID!,
-  DRAFT: process.env.NOTION_DRAFT_DB_ID!,
-  BLOG_PLAYFISH: process.env.NOTION_BLOG_PLAYFISH_DB_ID!,
-  BLOG_FIRE: process.env.NOTION_BLOG_FIRE_DB_ID!,
-  BLOG_IMMIGRATION: process.env.NOTION_BLOG_IMMIGRATION_DB_ID!,
+  SOURCE: process.env.NOTION_BLOG_SOURCE_DB_ID!,
+  DRAFT: process.env.NOTION_BLOG_AUTO_DRAFT_DB_ID!,
+  BLOG_PLAYFISH: process.env.NOTION_PLAYFISH_DB_ID!,
+  BLOG_FIRE: process.env.NOTION_FIRE_DB_ID!,
+  BLOG_IMMIGRATION: process.env.NOTION_IMMIGRATION_DB_ID!,
 };
 
 // Types for Notion properties (simplified)
@@ -24,24 +24,42 @@ export type NotionPage = {
   url: string;
 };
 
+export type PageContent = {
+  text: string;
+  imageUrls: string[];
+};
+
 /**
- * Helper to get text content from a page
- * Note: This fetches blocks and extracts text. 
- * For simple properties, access page.properties directly.
+ * Helper to get text and images from a page
  */
-export async function getPageContent(pageId: string): Promise<string> {
+export async function getPageContent(pageId: string): Promise<PageContent> {
   const blocks = await notion.blocks.children.list({
     block_id: pageId,
   });
 
-  return blocks.results
-    .map((block: any) => {
-      if (block.type === 'paragraph' && block.paragraph.rich_text.length > 0) {
-        return block.paragraph.rich_text.map((t: any) => t.plain_text).join('');
-      }
-      // Add other block types as needed (heading, bullet_list, etc)
-      return '';
-    })
-    .join('\n');
-}
+  let textContent = '';
+  const imageUrls: string[] = [];
 
+  for (const block of blocks.results as any[]) {
+    // Handle Paragraphs
+    if (block.type === 'paragraph' && block.paragraph.rich_text.length > 0) {
+      textContent += block.paragraph.rich_text.map((t: any) => t.plain_text).join('') + '\n';
+    }
+    // Handle Headings
+    else if (block.type.startsWith('heading')) {
+      const richText = block[block.type].rich_text;
+      if (richText.length > 0) {
+        textContent += richText.map((t: any) => t.plain_text).join('') + '\n';
+      }
+    }
+    // Handle Images
+    else if (block.type === 'image') {
+      const url = block.image.type === 'external' ? block.image.external.url : block.image.file.url;
+      if (url) {
+        imageUrls.push(url);
+      }
+    }
+  }
+
+  return { text: textContent.trim(), imageUrls };
+}

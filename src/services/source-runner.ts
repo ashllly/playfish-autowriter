@@ -85,7 +85,38 @@ export async function runSourceRunner() {
 
       // Generate Title if missing
       if (!hasTitle) {
-        if (!content.trim()) {
+        // If we have images, prioritize Vision
+        if (content.imageUrls.length > 0) {
+          console.log(`Page ${pageId} has images. Using Vision model to generate title.`);
+          const messages: any[] = [
+            {
+              role: 'system',
+              content: `You are an editor helper. Look at the image provided (which might be a screenshot of a post, article, or note). Extract the main topic or title from it. Return ONLY the title text, no quotes. Language: Chinese (Simplified).`,
+            },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: content.imageUrls[0], // Use the first image
+                  },
+                },
+              ],
+            },
+          ];
+
+          // Using gpt-4o for vision capabilities
+          const generatedTitle = await openai.chat.completions.create({
+            model: 'gpt-4o', 
+            messages,
+            max_tokens: 100,
+          });
+
+          newTitle = generatedTitle.choices[0]?.message?.content?.trim() || 'Untitled Source (Image)';
+        } 
+        // Fallback to text content
+        else if (!content.text.trim()) {
           console.log(`Page ${pageId} has no content. Setting default title.`);
           newTitle = 'Untitled Source (No Content)';
         } else {
@@ -96,7 +127,7 @@ export async function runSourceRunner() {
             },
             {
               role: 'user',
-              content: content.substring(0, 2000),
+              content: content.text.substring(0, 2000),
             },
           ];
 
