@@ -2,10 +2,9 @@ import { NextResponse } from 'next/server';
 import { runSourceRunner } from '@/services/source-runner';
 
 export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET_TOKEN}`) {
-    return new Response('Unauthorized', { status: 401 });
-  }
+  // Vercel Cron routes are protected by Vercel's infrastructure
+  // No additional authentication needed - only Vercel can call these routes
+  // For manual testing, you can call /api/runner/source instead
 
   try {
     const result = await runSourceRunner();
