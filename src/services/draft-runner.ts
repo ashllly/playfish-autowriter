@@ -123,7 +123,8 @@ export async function runDraftRunner(): Promise<DraftResult> {
       ].join('\n');
       
       // Split content into blocks (Notion has 2000 char limit per block)
-      const contentBlocks = [];
+      // Explicitly type as any[] to avoid TS inference issues with Notion API types
+      const contentBlocks: any[] = [];
       const MAX_CHUNK_LENGTH = 1800;
       for (let i = 0; i < fullContent.length; i += MAX_CHUNK_LENGTH) {
         contentBlocks.push({
@@ -218,7 +219,7 @@ export async function runDraftRunner(): Promise<DraftResult> {
       // Need to split draft content into blocks (Notion has 2000 char limit per block)
       // For simplicity, we'll put the whole draft in one or few paragraph blocks.
       // Better implementation would parse Markdown to Blocks, but for now simple text.
-      const blogContentBlocks = [];
+      const blogContentBlocks: any[] = [];
       // Reusing MAX_CHUNK_LENGTH from above
       const draftText = draftData.draft || '';
       for (let i = 0; i < draftText.length; i += MAX_CHUNK_LENGTH) {
