@@ -1,13 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/cron/source-runner",
-      "schedule": "0 15 * * *"
-    },
-    {
-      "path": "/api/cron/draft-runner",
+      "path": "/api/cron/daily",
       "schedule": "0 15 * * *"
     }
   ]
 }
-

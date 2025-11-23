@@ -5,9 +5,9 @@ import { useState } from 'react';
 export default function DashboardPage() {
   const [loadingSource, setLoadingSource] = useState(false);
   const [sourceResult, setSourceResult] = useState<any>(null);
+  const [loadingDraft, setLoadingDraft] = useState(false);
+  const [draftResult, setDraftResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [cronTime, setCronTime] = useState('11:00');
-  const [showCronConfig, setShowCronConfig] = useState(false);
 
   const runSourceRunner = async () => {
     setLoadingSource(true);
@@ -37,6 +37,35 @@ export default function DashboardPage() {
       setError(err.message || 'Unknown error occurred');
     } finally {
       setLoadingSource(false);
+    }
+  };
+
+  const runDraftRunner = async () => {
+    setLoadingDraft(true);
+    setError(null);
+    setDraftResult(null);
+
+    try {
+      const res = await fetch('/api/runner/draft', { method: 'POST' });
+      const data = await res.json();
+      
+      if (!res.ok || !data.success) {
+        if (data.code === 'insufficient_quota' || res.status === 402) {
+          setError(`⚠️ ${data.error || 'OpenAI API 配额不足'}\n\n${data.errorDetails || '请检查你的 OpenAI 账户余额和账单设置。'}`);
+        } else {
+          setError(data.error || data.message || `HTTP Error: ${res.status}`);
+        }
+        if (data.data) {
+          setDraftResult(data);
+        }
+      } else {
+        setDraftResult(data);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Unknown error occurred');
+    } finally {
+      setLoadingDraft(false);
     }
   };
 
@@ -114,7 +143,7 @@ export default function DashboardPage() {
                 </button>
               </div>
 
-              {/* Result Display */}
+              {/* Source Result Display */}
               {sourceResult && (
                 <div className={`mt-4 rounded-md p-3 border ${
                   sourceResult.warning 
@@ -149,29 +178,72 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Draft Runner Placeholder */}
-          <div className="bg-white overflow-hidden shadow rounded-lg border border-gray-100 opacity-60">
+          {/* Draft Runner Card */}
+          <div className="bg-white overflow-hidden shadow rounded-lg border border-gray-100">
             <div className="px-4 py-5 sm:p-6">
                <div className="flex items-center justify-between mb-4">
                  <h3 className="text-lg leading-6 font-medium text-gray-900">
                   Draft Runner
                  </h3>
-                 <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                 <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800">
                    Stage 2
                  </span>
               </div>
               <div className="mt-2 max-w-xl text-sm text-gray-500">
-                <p>Generates full drafts for sources marked as "Send". (Coming soon)</p>
+                <p>Generates full drafts for sources marked as "Send" (and not "Used").</p>
               </div>
               <div className="mt-5">
                 <button
-                  disabled
+                  onClick={runDraftRunner}
+                  disabled={loadingDraft}
                   type="button"
-                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-gray-400 cursor-not-allowed"
+                  className={`inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white 
+                    ${loadingDraft ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'}`}
                 >
-                  Coming Soon
+                  {loadingDraft ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Running...
+                    </>
+                  ) : 'Trigger Manually'}
                 </button>
               </div>
+
+              {/* Draft Result Display */}
+              {draftResult && (
+                <div className={`mt-4 rounded-md p-3 border ${
+                  draftResult.warning || (draftResult.data?.errors && draftResult.data.errors.length > 0)
+                    ? 'bg-yellow-50 border-yellow-200' 
+                    : 'bg-green-50 border-green-100'
+                }`}>
+                  <p className={`text-sm font-medium ${
+                    draftResult.warning || (draftResult.data?.errors && draftResult.data.errors.length > 0) ? 'text-yellow-800' : 'text-green-800'
+                  }`}>
+                    {draftResult.warning ? '⚠️ Warning' : '✅ Success'}: {draftResult.message}
+                  </p>
+                  {draftResult.data && (
+                    <div className="mt-2">
+                      <p className="text-xs font-semibold text-gray-600 mb-1">处理结果:</p>
+                      <pre className="text-xs text-gray-700 overflow-x-auto">
+                        {JSON.stringify(draftResult.data, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                  {draftResult.data?.errors && draftResult.data.errors.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-yellow-200">
+                      <p className="text-xs font-semibold text-yellow-700 mb-1">错误详情:</p>
+                      <ul className="text-xs text-yellow-700 list-disc list-inside">
+                        {draftResult.data.errors.map((err: string, idx: number) => (
+                          <li key={idx}>{err}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -180,4 +252,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

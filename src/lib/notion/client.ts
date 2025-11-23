@@ -22,12 +22,16 @@ export const notion = new Proxy({} as Client, {
 });
 
 // Database IDs helper
+// Notion Database Names:
+// - Blog-Playfish (摸鱼主题)
+// - Blog-FIRE (FIRE 主题)
+// - Blog-Immigrant (移民主题)
 export const DB_IDS = {
   SOURCE: process.env.NOTION_BLOG_SOURCE_DB_ID!,
   DRAFT: process.env.NOTION_BLOG_AUTO_DRAFT_DB_ID!,
-  BLOG_PLAYFISH: process.env.NOTION_PLAYFISH_DB_ID!,
-  BLOG_FIRE: process.env.NOTION_FIRE_DB_ID!,
-  BLOG_IMMIGRATION: process.env.NOTION_IMMIGRATION_DB_ID!,
+  BLOG_PLAYFISH: process.env.NOTION_BLOG_PLAYFISH_DB_ID!, // Blog-Playfish
+  BLOG_FIRE: process.env.NOTION_BLOG_FIRE_DB_ID!, // Blog-FIRE
+  BLOG_IMMIGRATION: process.env.NOTION_BLOG_IMMIGRATION_DB_ID!, // Blog-Immigrant
 };
 
 // Types for Notion properties (simplified)

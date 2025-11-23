@@ -39,7 +39,7 @@
                           ↓
 生成：角度分析、大纲、草稿、思考日志
                           ↓
-GPT 判断 TargetBlog (Immigrant/Playfish/FIRE)
+GPT 判断 TargetBlog (Immigrant/Playfish/FIRE) - 对应 Notion DB: Blog-Immigrant / Blog-Playfish / Blog-FIRE
                           ↓
 自动将草稿内容贴入对应 Blog DB（标题、正文、语言=简体）
                           ↓
@@ -132,7 +132,7 @@ GPT 判断 TargetBlog (Immigrant/Playfish/FIRE)
 | 字段名 | 类型 | 自动/手动 | 说明 |
 |--------|------|-----------|------|
 | **Title** | Title | 自动 | 大纲标题（GPT 生成） |
-| **TargetBlog** | Select | 自动 | GPT 自行判断：Immigrant / Playfish / FIRE |
+| **TargetBlog** | Select | 自动 | GPT 自行判断：Immigrant / Playfish / FIRE（对应 Notion DB: Blog-Immigrant / Blog-Playfish / Blog-FIRE） |
 | **SourceID** | Text | 自动 | 对应 Source DB 的 SourceID |
 | **DraftID** | Text | 自动 | 例如 `draft_0001` |
 | **Created time** | Created Time | 自动 | Notion 默认字段 |
@@ -146,7 +146,7 @@ GPT 判断 TargetBlog (Immigrant/Playfish/FIRE)
   - 大纲
   - 文章草稿（简体中文）
   - 思考日志（全部保留）
-- GPT 自动判断 TargetBlog（Immigrant/Playfish/FIRE）
+- GPT 自动判断 TargetBlog（Immigrant/Playfish/FIRE，对应 Notion DB: Blog-Immigrant / Blog-Playfish / Blog-FIRE）
 - 系统自动将草稿内容贴入对应 Blog DB：
   - 标题 → Title
   - 正文 → Content
@@ -158,9 +158,9 @@ GPT 判断 TargetBlog (Immigrant/Playfish/FIRE)
 ### 🟥 3. **Playfish-Blog（正式稿库）**
 
 **重要：博客不是按语言区分的，而是按照三大主题分类：**
-- **摸鱼** (MoYu)
-- **FIRE**
-- **移民** (Immigration)
+- **摸鱼** - Notion DB 名称：**Blog-Playfish**
+- **FIRE** - Notion DB 名称：**Blog-FIRE**
+- **移民** - Notion DB 名称：**Blog-Immigrant**
 
 **每个主题的 Blog DB 结构：**
 
@@ -172,9 +172,9 @@ GPT 判断 TargetBlog (Immigrant/Playfish/FIRE)
 | **DraftID** | Text | 手动/自动 | 方便追溯 |
 | **Language** | Select | 手动/自动 | 语言标签：简体中文 / 繁体中文 / English |
 | **Content** | Page Content | 手动 | 正文内容 |
-| **ICU_Title** | Text | 自动 | SEO 标题 |
-| **ICU_Description** | Text | 自动 | SEO 描述 |
-| **ICU_Keywords** | Text | 自动 | SEO 关键词 |
+| **meta-title** | Text | 自动 | SEO 标题 (PF-SEO 生成) |
+| **Description** | Text | 自动 | SEO 描述 (PF-SEO 生成) |
+| **Keywords** | Text | 自动 | SEO 关键词 (PF-SEO 生成) |
 | **Cover** | URL | 自动 | AI 封面图 URL（存储在 Cloudflare R2） |
 | **Published** | Checkbox | 手动 | 勾选 = 开始自动化发布流程 |
 | **PublicationDate** | Date | 自动 | 发布时间戳 |
@@ -236,7 +236,7 @@ GPT 判断 TargetBlog (Immigrant/Playfish/FIRE)
    - Title（大纲标题）
    - SourceID（对应 Source）
    - DraftID（自动生成）
-   - TargetBlog（GPT 自行判断：Immigrant/Playfish/FIRE）
+   - TargetBlog（GPT 自行判断：Immigrant/Playfish/FIRE，对应 Notion DB: Blog-Immigrant / Blog-Playfish / Blog-FIRE）
    - 正文（包含角度分析、大纲、草稿、思考日志）
 
 4. **自动将 Draft 中的正文部分，贴入对应博客数据库（三个博客主题中的一个）：**
@@ -246,9 +246,9 @@ GPT 判断 TargetBlog (Immigrant/Playfish/FIRE)
    - SourceID、DraftID → 对应字段
 
 5. **触发命令集 PF-SEO，自动写入对应博客数据库的 SEO 信息：**
-   - ICU_Title
-   - ICU_Description
-   - ICU_Keywords
+   - meta-title
+   - Description
+   - Keywords
 
 6. **Draft 生成完成后，系统自动勾选 Source DB 的 Used**
    - 此时 `Send`=✅, `Used`=✅ -> 流程结束，不会重复触发
@@ -320,9 +320,9 @@ OPENAI_PROJECT_ID=
 NOTION_API_TOKEN=
 NOTION_SOURCE_DB_ID=
 NOTION_DRAFT_DB_ID=
-NOTION_BLOG_PLAYFISH_DB_ID=      # 摸鱼主题
-NOTION_BLOG_FIRE_DB_ID=      # FIRE 主题
-NOTION_BLOG_IMMIGRATION_DB_ID= # 移民主题
+NOTION_BLOG_PLAYFISH_DB_ID=      # 摸鱼主题 (Notion DB: Blog-Playfish)
+NOTION_BLOG_FIRE_DB_ID=      # FIRE 主题 (Notion DB: Blog-FIRE)
+NOTION_BLOG_IMMIGRATION_DB_ID= # 移民主题 (Notion DB: Blog-Immigrant)
 NOTION_WEBHOOK_SECRET=
 
 # Cloudflare R2 Storage (for images)
@@ -377,8 +377,8 @@ PLAYFISH_DEPLOY_WEBHOOK_URL=
 
 ### 数据库字段命名
 - **Source DB**: Title, SourceID, Send (Checkbox), Used (Checkbox), Created time, Last edited time, Page Content
-- **Draft DB**: Title, TargetBlog (Select: Immigrant/Playfish/FIRE), SourceID, DraftID, Created time, Last edited time, Page Content
-- **Blog DB**: Title, Slug, SourceID, DraftID, Language (Select: 简体中文/繁体中文/English), Content, ICU_Title, ICU_Description, ICU_Keywords, Cover, Published, PublicationDate, Created time, Last edited time
+- **Draft DB**: Title, TargetBlog (Select: Immigrant/Playfish/FIRE，对应 Notion DB: Blog-Immigrant / Blog-Playfish / Blog-FIRE), SourceID, DraftID, Created time, Last edited time, Page Content
+- **Blog DB**: Title, Slug, SourceID, DraftID, Language (Select: 简体中文/繁体中文/English), Content, meta-title, Description, Keywords, Cover, Published, PublicationDate, Created time, Last edited time
 
 ### 语言区分方式
 - **不是通过不同的数据库区分语言**
@@ -396,7 +396,7 @@ PLAYFISH_DEPLOY_WEBHOOK_URL=
 
 ### OpenAI 命令集（Command Sets）
 - **PF-Rewrite**: 用于 Draft Runner，生成角度分析、大纲、草稿、思考日志
-- **PF-SEO**: 用于自动生成 SEO 信息（ICU_Title, ICU_Description, ICU_Keywords）
+- **PF-SEO**: 用于自动生成 SEO 信息（meta-title, Description, Keywords）
 - **翻译命令集**: 待创建，用于多语言翻译（EN/繁体）
 
 ### 错误处理

@@ -25,11 +25,11 @@ export const openai = new Proxy({} as OpenAI, {
 
 // Model constants
 export const MODELS = {
-  REWRITE: 'gpt-4-turbo', // Placeholder for GPT-5.1, using current best
+  REWRITE: 'gpt-4o', // Best model for writing
   TRANSLATE: 'gpt-4o-mini',
   SEO: 'gpt-4o-mini',
   CLASSIFY: 'gpt-4o-mini',
-  IMAGE: 'dall-e-3', // Placeholder for GPT-image-1
+  IMAGE: 'dall-e-3',
 };
 
 export type ChatMessage = {
