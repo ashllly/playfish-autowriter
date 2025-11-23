@@ -1,11 +1,24 @@
 import { Client } from '@notionhq/client';
 
-if (!process.env.NOTION_API_TOKEN) {
-  throw new Error('NOTION_API_TOKEN is not defined in environment variables');
+// Lazy initialization to avoid build-time errors
+let _notion: Client | null = null;
+
+function getNotionClient(): Client {
+  if (!_notion) {
+    if (!process.env.NOTION_API_TOKEN) {
+      throw new Error('NOTION_API_TOKEN is not defined in environment variables');
+    }
+    _notion = new Client({
+      auth: process.env.NOTION_API_TOKEN,
+    });
+  }
+  return _notion;
 }
 
-export const notion = new Client({
-  auth: process.env.NOTION_API_TOKEN,
+export const notion = new Proxy({} as Client, {
+  get(_target, prop) {
+    return getNotionClient()[prop as keyof Client];
+  }
 });
 
 // Database IDs helper

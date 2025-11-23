@@ -6,6 +6,8 @@ export default function DashboardPage() {
   const [loadingSource, setLoadingSource] = useState(false);
   const [sourceResult, setSourceResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cronTime, setCronTime] = useState('11:00');
+  const [showCronConfig, setShowCronConfig] = useState(false);
 
   const runSourceRunner = async () => {
     setLoadingSource(true);

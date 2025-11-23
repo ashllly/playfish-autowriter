@@ -1,21 +1,28 @@
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
-if (
-  !process.env.CLOUDFLARE_ACCOUNT_ID ||
-  !process.env.CLOUDFLARE_ACCESS_KEY_ID ||
-  !process.env.CLOUDFLARE_SECRET_ACCESS_KEY
-) {
-  console.warn('Cloudflare R2 credentials missing. Storage client will not work.');
-}
+// Lazy initialization to avoid build-time errors
+let _s3: S3Client | null = null;
 
-const S3 = new S3Client({
-  region: 'auto',
-  endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: process.env.CLOUDFLARE_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.CLOUDFLARE_SECRET_ACCESS_KEY!,
-  },
-});
+function getS3Client(): S3Client {
+  if (!_s3) {
+    if (
+      !process.env.CLOUDFLARE_ACCOUNT_ID ||
+      !process.env.CLOUDFLARE_ACCESS_KEY_ID ||
+      !process.env.CLOUDFLARE_SECRET_ACCESS_KEY
+    ) {
+      throw new Error('Cloudflare R2 credentials missing. Storage client will not work.');
+    }
+    _s3 = new S3Client({
+      region: 'auto',
+      endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: process.env.CLOUDFLARE_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.CLOUDFLARE_SECRET_ACCESS_KEY!,
+      },
+    });
+  }
+  return _s3;
+}
 
 export async function uploadImage(
   buffer: Buffer,
@@ -30,6 +37,7 @@ export async function uploadImage(
   }
 
   try {
+    const S3 = getS3Client();
     await S3.send(
       new PutObjectCommand({
         Bucket: bucket,
