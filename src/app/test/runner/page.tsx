@@ -1,22 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 export default function TestRunnerPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    // Test API health on mount
-    fetch('/api/health')
-      .then(res => res.json())
-      .then(data => console.log('API Health:', data))
-      .catch(err => console.error('API Health Check Failed:', err));
-  }, []);
-
   const triggerSourceRunner = async () => {
     setLoading(true);
     setError(null);
@@ -55,14 +44,6 @@ export default function TestRunnerPage() {
       setLoading(false);
     }
   };
-
-  if (!mounted) {
-    return (
-      <div className="min-h-screen p-8 bg-gray-50 flex items-center justify-center">
-        <p>Loading...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen p-8 bg-gray-50">
