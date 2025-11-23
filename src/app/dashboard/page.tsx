@@ -17,6 +17,12 @@ export default function DashboardPage() {
   const [selectedDB, setSelectedDB] = useState<string>('All');
   const [batchLimit, setBatchLimit] = useState<number>(5);
   const [coverLogs, setCoverLogs] = useState<string[]>([]);
+  const [coverResults, setCoverResults] = useState<Array<{
+    title: string;
+    theme: string;
+    url?: string;
+    error?: string;
+  }>>([]);
 
   const runSourceRunner = async () => {
     setLoadingSource(true);
@@ -80,6 +86,7 @@ export default function DashboardPage() {
     setLoadingScan(true);
     setScanResult(null);
     setCoverLogs([]);
+    setCoverResults([]);
     setError(null);
     try {
       const res = await fetch('/api/runner/cover-manager');
@@ -101,6 +108,7 @@ export default function DashboardPage() {
 
     setProcessingCovers(true);
     setCoverLogs([]);
+    setCoverResults([]);
     
     // 1. Flatten and filter items
     let items: any[] = [];
@@ -137,13 +145,16 @@ export default function DashboardPage() {
         if (data.success) {
           setCoverProgress(prev => ({ ...prev, success: prev.success + 1 }));
           setCoverLogs(prev => [`✅ Success: ${task.title}`, ...prev]);
+          setCoverResults(prev => [{ title: task.title, theme: task.theme, url: data.url }, ...prev]);
         } else {
           setCoverProgress(prev => ({ ...prev, fail: prev.fail + 1 }));
           setCoverLogs(prev => [`❌ Failed: ${task.title} - ${data.error}`, ...prev]);
+          setCoverResults(prev => [{ title: task.title, theme: task.theme, error: data.error }, ...prev]);
         }
       } catch (err: any) {
         setCoverProgress(prev => ({ ...prev, fail: prev.fail + 1 }));
         setCoverLogs(prev => [`❌ Error: ${task.title} - ${err.message}`, ...prev]);
+        setCoverResults(prev => [{ title: task.title, theme: task.theme, error: err.message }, ...prev]);
       }
     }
 
@@ -216,12 +227,21 @@ export default function DashboardPage() {
                   {loadingSource ? 'Running...' : 'Trigger Manually'}
                 </button>
               </div>
-              {/* Result Display logic ... */}
+              {/* Source Result Display */}
               {sourceResult && (
                 <div className={`mt-4 rounded-md p-3 border ${sourceResult.warning ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-100'}`}>
                   <p className={`text-sm font-medium ${sourceResult.warning ? 'text-yellow-800' : 'text-green-800'}`}>
                     {sourceResult.warning ? '⚠️ Warning' : '✅ Success'}: {sourceResult.message}
                   </p>
+                  {sourceResult.data?.errors && sourceResult.data.errors.length > 0 && (
+                     <div className="mt-2 pt-2 border-t border-yellow-200">
+                       <ul className="text-xs text-yellow-700 list-disc list-inside">
+                         {sourceResult.data.errors.map((err: string, idx: number) => (
+                           <li key={idx}>{err}</li>
+                         ))}
+                       </ul>
+                     </div>
+                   )}
                 </div>
               )}
             </div>
@@ -265,6 +285,15 @@ export default function DashboardPage() {
                       <p className="text-gray-500">{item.targetBlog} | DraftID: {item.draftId}</p>
                     </div>
                   ))}
+                  {draftResult.data?.errors && draftResult.data.errors.length > 0 && (
+                     <div className="mt-2 pt-2 border-t border-yellow-200">
+                       <ul className="text-xs text-yellow-700 list-disc list-inside">
+                         {draftResult.data.errors.map((err: string, idx: number) => (
+                           <li key={idx}>{err}</li>
+                         ))}
+                       </ul>
+                     </div>
+                   )}
                 </div>
               )}
             </div>
@@ -371,6 +400,34 @@ export default function DashboardPage() {
                               className="bg-purple-600 h-2.5 rounded-full transition-all duration-300" 
                               style={{ width: `${(coverProgress.current / coverProgress.total) * 100}%` }}
                             ></div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Detailed Results (New Section) */}
+                      {coverResults.length > 0 && (
+                        <div className="mt-4 border-t border-gray-200 pt-3">
+                          <h4 className="text-xs font-bold text-gray-700 mb-2">Processing Results</h4>
+                          <div className="space-y-2">
+                            {coverResults.map((result, idx) => (
+                              <div key={idx} className={`p-2 rounded border text-xs flex justify-between items-center ${
+                                result.error ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'
+                              }`}>
+                                <div>
+                                  <span className="font-medium text-gray-900">{result.title}</span>
+                                  <span className="ml-2 px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[10px]">{result.theme}</span>
+                                </div>
+                                <div className="ml-4 flex-shrink-0">
+                                  {result.url ? (
+                                    <a href={result.url} target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">
+                                      View Image ↗
+                                    </a>
+                                  ) : (
+                                    <span className="text-red-600 font-medium">{result.error || 'Failed'}</span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       )}
