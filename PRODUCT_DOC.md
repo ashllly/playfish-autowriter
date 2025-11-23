@@ -30,10 +30,10 @@
 
 ```
 🌱 阶段1：灵感输入（完全手动）
-小红书截图 → Source DB → (自动生成 Title/ID, status=pending)
+小红书截图 → Source DB → (自动生成 Title/ID)
 
-⚙️ 阶段2：自动写草稿（完全自动）
-Source DB (status=pending) → 自动触发 Draft Runner
+⚙️ 阶段2：自动写草稿（用户勾选 Send 后自动触发）
+用户勾选 Send → 自动触发 Draft Runner
                           ↓
 调用 GPT-5.1 (PF-Rewrite) → Draft DB
                           ↓
@@ -70,7 +70,7 @@ GPT 判断 TargetBlog (Immigrant/Playfish/FIRE)
 - 部署文章
 
 你只需要：
-> **在 Source DB 贴图 → 审核草稿 → 手动贴封面图 URL → 勾选 Published ✔**
+> **在 Source DB 贴图 → 勾选 Send → 审核草稿 → 手动贴封面图 URL → 勾选 Published ✔**
 
 剩下全部自动完成。
 
@@ -111,7 +111,7 @@ GPT 判断 TargetBlog (Immigrant/Playfish/FIRE)
 |--------|------|-----------|------|
 | **Title** | Title | 自动 | 从正文自动生成的小红书标题 |
 | **SourceID** | Text | 自动 | 例如 `src_0001` |
-| **Status** | Select | 自动 | 默认 "pending"，生成 Draft 后改为 "used" |
+| **Send** | Checkbox | 手动 | 勾选后触发 Draft Runner（生成草稿） |
 | **Created time** | Created Time | 自动 | Notion 默认字段 |
 | **Last edited time** | Last Edited Time | 自动 | Notion 默认字段 |
 | **正文（Page Content）** | Page Content | 手动 | 用户粘贴图片 + 文本 |
@@ -120,8 +120,8 @@ GPT 判断 TargetBlog (Immigrant/Playfish/FIRE)
 - 用户在 Source DB 创建新记录
 - 在正文里贴上小红书截图或内容
 - 系统自动生成 Title 和 SourceID
-- Status 默认设置为 "pending"
-- 当该 Source 被用于生成 Draft 后，自动标记 Status = "used"
+- 用户勾选 Send 后，自动触发 Draft Runner
+- Draft 生成完成后，系统自动取消勾选 Send（可选，或保持勾选状态用于追踪）
 
 ---
 
@@ -206,16 +206,16 @@ GPT 判断 TargetBlog (Immigrant/Playfish/FIRE)
 | Title | ❌ 自动生成（ChatGPT） |
 | SourceID | ❌ 自动生成（UUID） |
 | CreatedTime | ❌ 自动写入 |
-| Status | ❌ 默认 "pending" |
+| Send | ✔ 你手动勾选（触发下一步） |
 
-➡️ **你只需要贴图 + 不做其他任何事。**
+➡️ **你只需要贴图 + 勾选 Send。**
 
 ---
 
-### ⚙️ 阶段 2：自动写草稿（完全自动）
+### ⚙️ 阶段 2：自动写草稿（用户勾选 Send 后自动触发）
 
 **触发条件：**
-当 Source DB 里新增一条记录（或 status="pending"）时，系统自动触发。
+当用户在 Source DB 中勾选 Send（checkbox）时，系统自动触发。
 
 **自动执行流程：**
 
@@ -248,7 +248,7 @@ GPT 判断 TargetBlog (Immigrant/Playfish/FIRE)
    - ICU_Description
    - ICU_Keywords
 
-6. **自动标记 Source DB 的 Status = "used"**
+6. **Draft 生成完成后，系统自动取消勾选 Source DB 的 Send（可选，或保持勾选状态用于追踪）**
 
 ---
 
@@ -280,7 +280,7 @@ GPT 判断 TargetBlog (Immigrant/Playfish/FIRE)
 - 功能：读取 Page Content，用 GPT 生成 Title 和 SourceID，写回 Notion
 
 **Draft Runner（自动生成大纲/草稿）**
-- 触发方式：**完全自动**，检测 Source DB 中 status="pending" 的记录
+- 触发方式：**用户勾选 Send 后自动触发**，检测 Source DB 中 Send=true 的记录
 - 功能：调用 GPT-5.1（PF-Rewrite），生成草稿，判断 TargetBlog，自动贴入对应 Blog DB，触发 PF-SEO
 
 **Publish Runner（发布流程）**
@@ -372,7 +372,7 @@ PLAYFISH_DEPLOY_WEBHOOK_URL=
 ## 📌 八、注意事项
 
 ### 数据库字段命名
-- **Source DB**: Title, SourceID, Status (Select: pending/used), Created time, Last edited time, Page Content
+- **Source DB**: Title, SourceID, Send (Checkbox), Created time, Last edited time, Page Content
 - **Draft DB**: Title, TargetBlog (Select: Immigrant/Playfish/FIRE), SourceID, DraftID, Created time, Last edited time, Page Content
 - **Blog DB**: Title, Slug, SourceID, DraftID, Language (Select: 简体中文/繁体中文/English), Content, ICU_Title, ICU_Description, ICU_Keywords, Cover, Published, PublicationDate, Created time, Last edited time
 
@@ -387,7 +387,7 @@ PLAYFISH_DEPLOY_WEBHOOK_URL=
 
 ### 触发机制
 - **Source Runner**: Webhook 或 Cron 轮询（检测新记录，自动生成 Title 和 SourceID）
-- **Draft Runner**: **完全自动**，检测 Source DB 中 status="pending" 的记录，自动生成草稿并贴入对应 Blog DB
+- **Draft Runner**: **用户勾选 Send 后自动触发**，检测 Source DB 中 Send=true 的记录，自动生成草稿并贴入对应 Blog DB
 - **Publish Runner**: 检测 Blog DB 中 Published 字段变化（用户手动勾选后触发）
 
 ### OpenAI 命令集（Command Sets）
