@@ -1,11 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function TestRunnerPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    // Test API health on mount
+    fetch('/api/health')
+      .then(res => res.json())
+      .then(data => console.log('API Health:', data))
+      .catch(err => console.error('API Health Check Failed:', err));
+  }, []);
 
   const triggerSourceRunner = async () => {
     setLoading(true);
@@ -13,6 +23,7 @@ export default function TestRunnerPage() {
     setResult(null);
 
     try {
+      console.log('Triggering Source Runner...');
       const response = await fetch('/api/runner/source', {
         method: 'POST',
         headers: {
@@ -20,19 +31,38 @@ export default function TestRunnerPage() {
         },
       });
 
-      const data = await response.json();
+      console.log('Response status:', response.status);
       
       if (!response.ok) {
-        throw new Error(data.error || 'Request failed');
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText || `HTTP ${response.status}` };
+        }
+        throw new Error(errorData.error || `Request failed with status ${response.status}`);
       }
 
+      const data = await response.json();
+      console.log('Success:', data);
       setResult(data);
     } catch (err: any) {
+      console.error('Error:', err);
       setError(err.message || 'Unknown error');
     } finally {
       setLoading(false);
     }
   };
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen p-8 bg-gray-50 flex items-center justify-center">
+        <p>Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-8 bg-gray-50">
