@@ -2,11 +2,11 @@
   "crons": [
     {
       "path": "/api/cron/source-runner",
-      "schedule": "0 3 * * *"
+      "schedule": "0 15 * * *"
     },
     {
       "path": "/api/cron/draft-runner",
-      "schedule": "0 3 * * *"
+      "schedule": "0 15 * * *"
     }
   ]
 }
