@@ -4,8 +4,17 @@ import { runSourceRunner } from '@/services/source-runner';
 /**
  * Manual trigger endpoint for Source Runner
  * Security: Basic Auth (username/password from env)
+ * In development: Skip auth if env vars are not set
  */
 function verifyAuth(request: Request): boolean {
+  // In development, allow skipping auth if env vars are not configured
+  if (process.env.NODE_ENV === 'development') {
+    if (!process.env.BASIC_AUTH_USERNAME || !process.env.BASIC_AUTH_PASSWORD) {
+      console.warn('⚠️  Basic Auth not configured. Allowing access in development mode.');
+      return true;
+    }
+  }
+
   const authHeader = request.headers.get('authorization');
   
   if (!authHeader || !authHeader.startsWith('Basic ')) {

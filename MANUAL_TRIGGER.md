@@ -1,8 +1,37 @@
 # 手动触发指南
 
+## 配置 Basic Auth
+
+### 1. 配置环境变量
+
+在 `.env` 或 `.env.local` 文件中添加：
+
+```env
+BASIC_AUTH_USERNAME=你的用户名
+BASIC_AUTH_PASSWORD=你的密码
+```
+
+**注意**: 
+- 开发环境下，如果未配置 Basic Auth，系统会自动允许访问（仅用于测试）
+- 生产环境（Vercel）必须配置 Basic Auth
+
+### 2. 在 Vercel 中配置环境变量
+
+1. 登录 Vercel Dashboard
+2. 进入项目设置 → Environment Variables
+3. 添加 `BASIC_AUTH_USERNAME` 和 `BASIC_AUTH_PASSWORD`
+
+---
+
 ## Source Runner 手动触发
 
-### 方式 1: 使用 curl (推荐)
+### 方式 1: 使用测试页面（最简单）✨
+
+1. 启动开发服务器: `npm run dev`
+2. 访问: `http://localhost:3000/test/runner`
+3. 点击按钮即可触发
+
+### 方式 2: 使用 curl (推荐)
 
 ```bash
 # 使用 Basic Auth
