@@ -1,6 +1,6 @@
 # 🐟 Playfish AutoWriter 产品文档
 
-> 项目代号：**墨语写手（MoYu AutoWriter）**  
+> 项目代号：**写稿打工仔（Playfish AutoWriter）**  
 > 项目域名：**autowriter.playfishlab.com**  
 > 部署环境：Vercel  
 > 数据层：Notion（3个数据库）  
@@ -29,35 +29,48 @@
 因此需要一个专属于 Playfish 的 **端到端 AI 写作自动化系统**：
 
 ```
-小红书截图 → Source DB → (自动生成 Title/ID)
+🌱 阶段1：灵感输入（完全手动）
+小红书截图 → Source DB → (自动生成 Title/ID, status=pending)
+
+⚙️ 阶段2：自动写草稿（完全自动）
+Source DB (status=pending) → 自动触发 Draft Runner
                           ↓
-用户触发 Draft Creation → Draft DB → 大纲/草稿/思考日志
+调用 GPT-5.1 (PF-Rewrite) → Draft DB
                           ↓
-用户写中文终稿 → Blog DB (按主题：摸鱼/Fire/移民)
+生成：角度分析、大纲、草稿、思考日志
                           ↓
-用户勾选 Reviewed → 自动翻译 EN/繁体 + GPT 图封面
+GPT 判断 TargetBlog (Immigrant/Playfish/FIRE)
                           ↓
-写入 Blog DB (多语言版本)
+自动将草稿内容贴入对应 Blog DB（标题、正文、语言=简体）
                           ↓
-Playfish 网站自动更新内容
+触发 PF-SEO → 自动写入 SEO 信息
+
+✍️ 阶段3：审核与发布（手动审核 + 自动发布）
+用户审核草稿 → 手动生成封面图 → 手动贴入 URL
+                          ↓
+手动勾选 Published
+                          ↓
+触发：简体版发布到 Playfish 主网站
+                          ↓
+触发：翻译成多语言（EN/繁体）
 ```
 
 ---
 
 ## 📌 二、项目目标
 
-### 🎯 **目标 1：让写文章的人只做"中文创作"这一件事**
+### 🎯 **目标 1：让写文章的人只做"贴图 + 审核"这两件事**
 
 你不需要：
 - 写大纲
 - 写初稿
 - 翻译
 - 写 SEO
-- 生成封面图
+- 生成封面图（手动生成但只需贴 URL）
 - 部署文章
 
 你只需要：
-> **写中文定稿 + 勾选 Reviewed ✔**
+> **在 Source DB 贴图 → 审核草稿 → 手动贴封面图 URL → 勾选 Published ✔**
 
 剩下全部自动完成。
 
@@ -98,15 +111,17 @@ Playfish 网站自动更新内容
 |--------|------|-----------|------|
 | **Title** | Title | 自动 | 从正文自动生成的小红书标题 |
 | **SourceID** | Text | 自动 | 例如 `src_0001` |
-| **Status-Used** | Checkbox | 自动 | 表示已用此灵感生成过 draft |
+| **Status** | Select | 自动 | 默认 "pending"，生成 Draft 后改为 "used" |
 | **Created time** | Created Time | 自动 | Notion 默认字段 |
 | **Last edited time** | Last Edited Time | 自动 | Notion 默认字段 |
 | **正文（Page Content）** | Page Content | 手动 | 用户粘贴图片 + 文本 |
 
 **工作流程：**
-- 用户粘贴素材到正文里
+- 用户在 Source DB 创建新记录
+- 在正文里贴上小红书截图或内容
 - 系统自动生成 Title 和 SourceID
-- 当该 Source 被用于生成 Draft 后，自动标记 Status-Used = true
+- Status 默认设置为 "pending"
+- 当该 Source 被用于生成 Draft 后，自动标记 Status = "used"
 
 ---
 
@@ -114,19 +129,27 @@ Playfish 网站自动更新内容
 
 | 字段名 | 类型 | 自动/手动 | 说明 |
 |--------|------|-----------|------|
-| **Title** | Title | 自动/手动 | 大纲标题 |
-| **Reviewed** | Checkbox | 手动 | 勾选后触发进入下一步（生成正式稿） |
+| **Title** | Title | 自动 | 大纲标题（GPT 生成） |
+| **TargetBlog** | Select | 自动 | GPT 自行判断：Immigrant / Playfish / FIRE |
 | **SourceID** | Text | 自动 | 对应 Source DB 的 SourceID |
 | **DraftID** | Text | 自动 | 例如 `draft_0001` |
 | **Created time** | Created Time | 自动 | Notion 默认字段 |
 | **Last edited time** | Last Edited Time | 自动 | Notion 默认字段 |
-| **正文（Page Content）** | Page Content | 自动 | 包含大纲、草稿、思考日志等 |
+| **正文（Page Content）** | Page Content | 自动 | 包含角度分析、大纲、草稿、思考日志等 |
 
 **工作流程：**
-- 用户从 Source 触发生成 Draft
-- 系统自动生成 Title、SourceID、DraftID
-- 系统在正文中写入：大纲、草稿、思考日志
-- 用户勾选 Reviewed 后，系统开始生成正式稿
+- **完全自动触发**：当 Source DB 中 status="pending" 的记录被检测到
+- 系统自动调用 GPT-5.1（PF-Rewrite 命令集）生成：
+  - 角度分析
+  - 大纲
+  - 文章草稿（简体中文）
+  - 思考日志（全部保留）
+- GPT 自动判断 TargetBlog（Immigrant/Playfish/FIRE）
+- 系统自动将草稿内容贴入对应 Blog DB：
+  - 标题 → Title
+  - 正文 → Content
+  - 语言 → Language = "简体中文"
+- 触发 PF-SEO 命令集，自动写入 SEO 信息到对应 Blog DB
 
 ---
 
@@ -157,80 +180,112 @@ Playfish 网站自动更新内容
 | **Last edited time** | Last Edited Time | 自动 | Notion 默认字段 |
 
 **工作流程：**
-- 用户从 Draft 中选择内容，手动编写中文终稿
-- 用户设置 Language = "简体中文"
-- 用户勾选 Published 后：
-  - 自动翻译为 EN 和繁体中文
-  - 自动生成 SEO ICU（每种语言）
-  - 自动生成封面图（上传到 Cloudflare R2）
-  - 自动创建对应语言版本的 Blog 条目
-  - 自动推送到 Playfish 网站
+- 系统自动从 Draft DB 将内容贴入对应 Blog DB（标题、正文、语言=简体、SEO 信息）
+- 用户审核草稿内容，可手动调整
+- 用户手动生成封面图，将 URL 手动贴入 Cover 字段
+- 用户手动勾选 Published 后：
+  - 触发：简体版文章发布到 Playfish 主网站（这是 Playfish 主网站 project 功能，与 autowriter 不互相影响）
+  - 触发：翻译成多语言（EN/繁体）- 将创建相应命令集
 
 ---
 
-## 📌 四、自动化流程（Automation Pipeline）
+## 📌 四、完整自动化流程（Automation Pipeline）
 
-### 🟦 1. **Source Runner（自动生成 Title + SourceID）**
+### 🌱 阶段 1：灵感输入（完全手动）
 
-**触发方式：**
-- Notion webhook：当新页面加入 Source DB
-- 或 Vercel Cron 轮询（每 1~5 分钟）
+**你做的事情：**
+- 在 Source DB 创建一条新记录
+- 在正文里贴上小红书截图或内容
+- 什么都不用填（Title、SourceID 自动生成）
 
-**功能：**
-- 读取 Page Content
-- 用 GPT 生成：
-  - Title（倾向使用小红书标题）
-  - SourceID（格式：`src_0001`）
-- 写回 Notion
+**字段填写方式：**
 
----
+| 字段 | 填写方式 |
+|------|----------|
+| Content（正文） | ✔ 你手动贴图/贴文字 |
+| Title | ❌ 自动生成（ChatGPT） |
+| SourceID | ❌ 自动生成（UUID） |
+| CreatedTime | ❌ 自动写入 |
+| Status | ❌ 默认 "pending" |
 
-### 🟩 2. **Draft Runner（自动生成大纲/草稿）**
-
-**触发方式：**
-- 用户在 autowriter dashboard 中点"生成大纲"
-- 或手动调用 API（POST `/api/draft-runner`）
-
-**功能：**
-- 从 Source Content + Title 获取信息
-- 用 Rewrite007 流程生成：
-  - 大纲
-  - 草稿
-  - 思考日志
-- 写入 Draft DB
-- 自动标记对应 Source 的 Status-Used = true
+➡️ **你只需要贴图 + 不做其他任何事。**
 
 ---
 
-### 🟥 3. **Publish Runner（主自动化）**
+### ⚙️ 阶段 2：自动写草稿（完全自动）
 
 **触发条件：**
-当用户在 Blog DB 中勾选 `Published: true`
+当 Source DB 里新增一条记录（或 status="pending"）时，系统自动触发。
 
 **自动执行流程：**
 
-1. **翻译（用 GPT-4.1 mini）**
+1. **读取 Source DB 记录**
+   - 内容（图片/文字）
+   - 自动生成 Title
+   - 自动生成 SourceID
+
+2. **调用 GPT-5.1（使用命令集 PF-Rewrite）生成：**
+   - 角度分析
+   - 大纲
+   - 文章草稿（简体中文）
+   - 思考日志（全部保留）
+
+3. **自动写入 Draft DB：**
+   - Title（大纲标题）
+   - SourceID（对应 Source）
+   - DraftID（自动生成）
+   - TargetBlog（GPT 自行判断：Immigrant/Playfish/FIRE）
+   - 正文（包含角度分析、大纲、草稿、思考日志）
+
+4. **自动将 Draft 中的正文部分，贴入对应博客数据库（三个博客主题中的一个）：**
+   - 标题 → Blog DB 的 Title 字段
+   - 正文 → Blog DB 的 Content 字段
+   - 语言 → Blog DB 的 Language = "简体中文"
+   - SourceID、DraftID → 对应字段
+
+5. **触发命令集 PF-SEO，自动写入对应博客数据库的 SEO 信息：**
+   - ICU_Title
+   - ICU_Description
+   - ICU_Keywords
+
+6. **自动标记 Source DB 的 Status = "used"**
+
+---
+
+### ✍️ 阶段 3：审核与发布（手动审核 + 自动发布）
+
+**你做的事情：**
+1. 审核草稿内容（可手动调整）
+2. 手动生成封面图
+3. 将封面图 URL 手动贴入 Blog DB 的 Cover 字段
+4. 手动将状态变为 Published（通过 checkbox）
+
+**自动执行流程（当 Published = true 时）：**
+
+1. **触发简体版文章发布到网上**
+   - 这是 Playfish 主网站 project 功能
+   - 与 autowriter 不互相影响
+
+2. **触发翻译成多语言（将创建相应命令集，暂时还没有）**
    - 英文版本
    - 繁体中文版本
+   - 自动创建对应语言版本的 Blog 条目
 
-2. **SEO ICU 自动生成**
-   - 标题 / 描述 / keywords（每种语言）
+---
 
-3. **生成封面图（GPT-image-1）**
-   - 上传到 Cloudflare R2
-   - 获取公开 URL
-   - 写回 Cover 字段
+### 🔧 技术实现细节
 
-4. **写入到对应主题的 Blog DB**
-   - 创建 EN 版本条目（Language = "English"）
-   - 创建繁体中文版本条目（Language = "繁体中文"）
-   - 包含：标题、正文、slug、ICU、cover、sourceID、draftID、PublicationDate
+**Source Runner（自动生成 Title + SourceID）**
+- 触发方式：Notion webhook 或 Vercel Cron 轮询（每 1~5 分钟）
+- 功能：读取 Page Content，用 GPT 生成 Title 和 SourceID，写回 Notion
 
-5. **通知（可选）**
-   - 邮件
-   - TG
-   - Webhook
-   - 在 dashboard 记录日志
+**Draft Runner（自动生成大纲/草稿）**
+- 触发方式：**完全自动**，检测 Source DB 中 status="pending" 的记录
+- 功能：调用 GPT-5.1（PF-Rewrite），生成草稿，判断 TargetBlog，自动贴入对应 Blog DB，触发 PF-SEO
+
+**Publish Runner（发布流程）**
+- 触发条件：Blog DB 中 Published 字段变为 true
+- 功能：发布简体版到 Playfish 主网站，触发多语言翻译（待实现）
 
 ---
 
@@ -317,9 +372,9 @@ PLAYFISH_DEPLOY_WEBHOOK_URL=
 ## 📌 八、注意事项
 
 ### 数据库字段命名
-- **Source DB**: Title, SourceID, Status-Used, Created time, Last edited time, Page Content
-- **Draft DB**: Title, Reviewed, SourceID, DraftID, Created time, Last edited time, Page Content
-- **Blog DB**: Title, Slug, SourceID, DraftID, Language, Content, ICU_Title, ICU_Description, ICU_Keywords, Cover, Published, PublicationDate, Created time, Last edited time
+- **Source DB**: Title, SourceID, Status (Select: pending/used), Created time, Last edited time, Page Content
+- **Draft DB**: Title, TargetBlog (Select: Immigrant/Playfish/FIRE), SourceID, DraftID, Created time, Last edited time, Page Content
+- **Blog DB**: Title, Slug, SourceID, DraftID, Language (Select: 简体中文/繁体中文/English), Content, ICU_Title, ICU_Description, ICU_Keywords, Cover, Published, PublicationDate, Created time, Last edited time
 
 ### 语言区分方式
 - **不是通过不同的数据库区分语言**
@@ -331,9 +386,14 @@ PLAYFISH_DEPLOY_WEBHOOK_URL=
 - 需要配置 CLOUDFLARE_R2_PUBLIC_URL 作为公开访问地址
 
 ### 触发机制
-- Source Runner: Webhook 或 Cron 轮询
-- Draft Runner: 手动触发（Dashboard 或 API）
-- Publish Runner: 检测 Blog DB 中 Published 字段变化
+- **Source Runner**: Webhook 或 Cron 轮询（检测新记录，自动生成 Title 和 SourceID）
+- **Draft Runner**: **完全自动**，检测 Source DB 中 status="pending" 的记录，自动生成草稿并贴入对应 Blog DB
+- **Publish Runner**: 检测 Blog DB 中 Published 字段变化（用户手动勾选后触发）
+
+### OpenAI 命令集（Command Sets）
+- **PF-Rewrite**: 用于 Draft Runner，生成角度分析、大纲、草稿、思考日志
+- **PF-SEO**: 用于自动生成 SEO 信息（ICU_Title, ICU_Description, ICU_Keywords）
+- **翻译命令集**: 待创建，用于多语言翻译（EN/繁体）
 
 ### 错误处理
 - 所有自动化流程需要有错误日志
