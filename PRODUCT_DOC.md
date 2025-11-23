@@ -176,7 +176,7 @@ GPT 判断 TargetBlog (Immigrant/Playfish/FIRE) - 对应 Notion DB: Blog-Immigra
 | **Description** | Text | 自动 | SEO 描述 (PF-SEO 生成) |
 | **Keywords** | Text | 自动 | SEO 关键词 (PF-SEO 生成) |
 | **Tag** | Multi-select | 自动 | 文章标签（优先匹配预定义列表） |
-| **TagSlug** | Text | 自动 | 标签对应的 URL Slug（逗号分隔） |
+| **tag-slug** | Multi-select | 自动 | 标签对应的 URL Slug（多个选项） |
 | **Section** | Select | 自动 | 网站发布板块 (playfish / fire / immigrant) |
 | **Cover** | URL | 自动 | AI 封面图 URL（存储在 Cloudflare R2） |
 | **Published** | Checkbox | 手动 | 勾选 = 开始自动化发布流程 |
@@ -275,7 +275,7 @@ PF-SEO 将优先从以下列表中选择标签。如果都不合适，GPT 可以
    - Description
    - Keywords
    - Tag (优先匹配预定义标签)
-   - TagSlug (对应标签的英文 Slug)
+   - tag-slug (对应标签的英文 Slug)
    - Section (根据 TargetBlog 自动映射：playfish/fire/immigrant)
 
 6. **Draft 生成完成后，系统自动勾选 Source DB 的 Used**
@@ -406,7 +406,7 @@ PLAYFISH_DEPLOY_WEBHOOK_URL=
 ### 数据库字段命名
 - **Source DB**: Title, SourceID, Send (Checkbox), Used (Checkbox), Created time, Last edited time, Page Content
 - **Draft DB**: Title, TargetBlog (Select: Immigrant/Playfish/FIRE，对应 Notion DB: Blog-Immigrant / Blog-Playfish / Blog-FIRE), SourceID, DraftID, Created time, Last edited time, Page Content
-- **Blog DB**: Title, Slug, SourceID, DraftID, Lang (Select: zh-hans/zh-hant/en), Content, meta-title, Description, Keywords, Tag, TagSlug, Section, Cover, Published, PublicationDate, Created time, Last edited time
+- **Blog DB**: Title, Slug, SourceID, DraftID, Lang (Select: zh-hans/zh-hant/en), Content, meta-title, Description, Keywords, Tag, tag-slug, Section, Cover, Published, PublicationDate, Created time, Last edited time
 
 ### 语言区分方式
 - **不是通过不同的数据库区分语言**

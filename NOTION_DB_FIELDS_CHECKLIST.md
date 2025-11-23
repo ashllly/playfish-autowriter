@@ -148,7 +148,7 @@
 | **Description** | Text (Rich Text) | ✅ | 自动 | SEO 描述 | "本文从实操角度介绍..." |
 | **Keywords** | Text (Rich Text) | ✅ | 自动 | SEO 关键词 | "情绪管理, 内耗, 自我提升" |
 | **Tag** | Multi-select | ⚠️ | 自动 | 文章标签 | `摸鱼艺术`, `时间管理` |
-| **TagSlug** | Text (Rich Text) | ⚠️ | 自动 | 标签对应的 URL Slug | `art-of-fish, time-management` |
+| **tag-slug** | Multi-select | ⚠️ | 自动 | 标签对应的 URL Slug | `art-of-fish`, `time-management` |
 | **Section** | Select | ✅ | 自动 | 网站发布板块 | `playfish` / `fire` / `immigrant` |
 | **Cover** | URL | ☐ | 手动 | AI 封面图 URL | `https://r2.cloudflarestorage.com/...` |
 | **Published** | Checkbox | ✅ | 手动 | 勾选 = 开始自动化发布流程 | ✅ / ☐ |
@@ -189,8 +189,9 @@
 10. **Tag** (Multi-select 类型)
     - 由 PF-SEO 生成，优先匹配预定义列表
 
-11. **TagSlug** (Text 类型，Rich Text)
-    - 由 PF-SEO 生成，对应 Tag 的 Slug (逗号分隔)
+11. **tag-slug** (Multi-select 类型)
+    - 由 PF-SEO 生成，对应 Tag 的 Slug
+    - 系统会将逗号分隔的字符串自动转换为多个选项
 
 12. **Section** (Select 类型)
     - 网站发布板块，用于前端路由
@@ -266,7 +267,7 @@
 ### Blog DB 创建步骤（Playfish / FIRE / Immigrant）：
 1. 创建新的 Database
 2. 添加基础字段：`Title`, `Slug`, `SourceID`, `DraftID`, `Lang`, `meta-title`, `Description`, `Keywords`
-3. 添加 **Tag** (Multi-select) 和 **TagSlug** (Text)
+3. 添加 **Tag** (Multi-select) 和 **tag-slug** (Multi-select)
 4. 添加 **Section** (Select, 选项: `playfish`, `fire`, `immigrant`)
 5. 添加 `Cover` (URL), `Published` (Checkbox), `PublicationDate` (Date)
 6. Created time 和 Last edited time 是 Notion 默认字段，自动存在
@@ -279,7 +280,7 @@
 
 - [ ] Source DB 有 `Title`、`TargetBlog`、`SourceID`、`Send`、`Used` 字段
 - [ ] Draft DB 有 `Title`、`TargetBlog`、`SourceID`、`DraftID` 字段
-- [ ] Blog DB 有 `Tag` (Multi-select) 和 `TagSlug` (Text) 字段
+- [ ] Blog DB 有 `Tag` (Multi-select) 和 `tag-slug` (Multi-select) 字段
 - [ ] `TargetBlog` 的选项值完全匹配：`Playfish`（只有 P 大写）、`FIRE`、`Immigrant`
 - [ ] 字段名大小写正确（驼峰命名）
 - [ ] 所有字段类型正确

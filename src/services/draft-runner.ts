@@ -2,6 +2,28 @@ import { notion, DB_IDS, getPageContent, PageContent } from '@/lib/notion/client
 import { openai, MODELS, ChatMessage } from '@/lib/openai/client';
 import { PROMPTS } from '@/lib/openai/prompts';
 import { nanoid } from 'nanoid';
+import { BlockObjectRequest } from '@notionhq/client/build/src/api-endpoints';
+
+const BLOG_TAGS = {
+  Playfish: [
+    '摸鱼艺术 (art-of-fish)',
+    '时间管理 (time-management)',
+  ],
+  Immigrant: [
+    '亚洲 (asia)',
+    '欧洲 (eu)',
+    '北美 (na)',
+    '澳洲 (au)',
+  ],
+  FIRE: [
+    '什么是FIRE (what-is-fire)',
+    '生活成本 (living-cost)',
+    '理财规划 (financial-planning)',
+    '医疗保险 (health-insurance)',
+    '中产焦虑 (middle-class-anxiety)',
+    '风险管理 (risk-management)',
+  ]
+};
 
 type DraftResult = {
   processed: number;
@@ -238,7 +260,7 @@ export async function runDraftRunner(): Promise<DraftResult> {
         Description: '', 
         Keywords: '',
         Tag: [],
-        TagSlug: ''
+        'tag-slug': ''
       };
 
       // 7. Create Entry in Blog DB
@@ -290,8 +312,13 @@ export async function runDraftRunner(): Promise<DraftResult> {
           Tag: {
             multi_select: (Array.isArray(seoData.Tag) ? seoData.Tag : []).map((t: string) => ({ name: t })),
           },
-          TagSlug: {
-            rich_text: [{ text: { content: seoData.TagSlug || '' } }],
+          'tag-slug': {
+            multi_select: (() => {
+              const tagSlugStr = seoData['tag-slug'] || seoData.TagSlug || '';
+              if (!tagSlugStr) return [];
+              // Split by comma and trim each slug
+              return tagSlugStr.split(',').map((slug: string) => ({ name: slug.trim() }));
+            })(),
           },
           Section: {
             select: { name: sectionValue },

@@ -147,7 +147,7 @@ AI 必须从 24 种开头技巧中：
     - Description
     - Keywords
     - Tag (Multi-select)
-    - TagSlug (Text)
+    - tag-slug (Text)
 
     ------------------------------------------------------------
     【输入】
@@ -169,7 +169,7 @@ AI 必须从 24 种开头技巧中：
       "Description": "...",
       "Keywords": "关键词1, 关键词2, 关键词3",
       "Tag": ["标签1", "标签2"],
-      "TagSlug": "tag-slug-1, tag-slug-2",
+      "tag-slug": "tag-slug-1, tag-slug-2",
       "should_use_article_title_as_meta_title": true/false,
       "reasoning": "..."
     }
@@ -191,13 +191,13 @@ AI 必须从 24 种开头技巧中：
     - 美国房产过户流程 → "us-property-title-transfer"
 
     ------------------------------------------------------------
-    【Tag & TagSlug 生成规则】
+    【Tag & tag-slug 生成规则】
     1. **优先匹配**：必须优先从输入的 AvailableTags 中选择最匹配的标签。
     2. **匹配逻辑**：如果文章内容与 AvailableTags 中的某个标签高度相关，则使用该标签及其对应的 Slug。
     3. **格式**：
        - Tag: 返回标签名称数组（如 ["摸鱼艺术"]）
-       - TagSlug: 返回对应的 Slug，多个用逗号分隔（如 "art-of-fish"）
-    4. **新标签建议**：如果不匹配任何 AvailableTags，请在 reasoning 字段中建议新标签，但在 Tag 和 TagSlug 字段中**尽量**选择最接近的现有标签，或者留空（如果完全不相关）。**不要随意创造不在列表中的 Tag，除非确信现有列表完全无法覆盖。**
+       - tag-slug: 返回对应的 Slug，多个用逗号分隔（如 "art-of-fish"）
+    4. **新标签建议**：如果不匹配任何 AvailableTags，请在 reasoning 字段中建议新标签，但在 Tag 和 tag-slug 字段中**尽量**选择最接近的现有标签，或者留空（如果完全不相关）。**不要随意创造不在列表中的 Tag，除非确信现有列表完全无法覆盖。**
 
     ------------------------------------------------------------
     【meta-title（Meta Title）生成规则】
@@ -245,7 +245,7 @@ AI 必须从 24 种开头技巧中：
     ------------------------------------------------------------
     【最终输出要求】
     - 返回严格 JSON 格式
-    - 字段名必须为：Slug、meta-title、Description、Keywords、Tag、TagSlug
+    - 字段名必须为：Slug、meta-title、Description、Keywords、Tag、tag-slug
     - reasoning 字段必须简短说明 meta-title 选择逻辑及 Tag 选择理由
     - 所有内容必须是简体中文
     - 禁止 markdown、禁止附带说明文字
