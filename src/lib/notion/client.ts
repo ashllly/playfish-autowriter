@@ -29,9 +29,9 @@ export const notion = new Proxy({} as Client, {
 export const DB_IDS = {
   SOURCE: process.env.NOTION_BLOG_SOURCE_DB_ID!,
   DRAFT: process.env.NOTION_BLOG_AUTO_DRAFT_DB_ID!,
-  BLOG_PLAYFISH: process.env.NOTION_BLOG_PLAYFISH_DB_ID!, // Blog-Playfish
-  BLOG_FIRE: process.env.NOTION_BLOG_FIRE_DB_ID!, // Blog-FIRE
-  BLOG_IMMIGRATION: process.env.NOTION_BLOG_IMMIGRATION_DB_ID!, // Blog-Immigrant
+  BLOG_PLAYFISH: process.env.NOTION_PLAYFISH_DB_ID!, // Blog-Playfish
+  BLOG_FIRE: process.env.NOTION_FIRE_DB_ID!, // Blog-FIRE
+  BLOG_IMMIGRATION: process.env.NOTION_IMMIGRATION_DB_ID!, // Blog-Immigrant
 };
 
 // Types for Notion properties (simplified)

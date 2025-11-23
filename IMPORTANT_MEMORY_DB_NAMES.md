@@ -25,10 +25,10 @@
    "Immigrant" -> DB_IDS.BLOG_IMMIGRATION -> Blog-Immigrant
    ```
 
-3. **环境变量命名**（保持不变）：
-   - `NOTION_BLOG_PLAYFISH_DB_ID`
-   - `NOTION_BLOG_FIRE_DB_ID`
-   - `NOTION_BLOG_IMMIGRATION_DB_ID`
+3. **环境变量命名**：
+   - `NOTION_PLAYFISH_DB_ID`
+   - `NOTION_FIRE_DB_ID`
+   - `NOTION_IMMIGRATION_DB_ID`
 
 4. **PF-Rewrite 输出**：`targetBlog` 字段必须返回 `"Playfish"`、`"FIRE"` 或 `"Immigrant"`（与 Notion DB 名称完全一致）
 

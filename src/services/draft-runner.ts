@@ -14,8 +14,11 @@ export async function runDraftRunner(): Promise<DraftResult> {
   console.log('Starting Draft Runner...');
 
   // 1. Query Source DB for Send=true AND Used=false
+  const sourceDbId = process.env.NOTION_BLOG_SOURCE_DB_ID;
+  if (!sourceDbId) throw new Error('NOTION_BLOG_SOURCE_DB_ID missing');
+
   const response = await notion.databases.query({
-    database_id: DB_IDS.SOURCE,
+    database_id: sourceDbId,
     filter: {
       and: [
         {
@@ -132,8 +135,11 @@ export async function runDraftRunner(): Promise<DraftResult> {
         });
       }
       
+      const draftDbId = process.env.NOTION_BLOG_AUTO_DRAFT_DB_ID;
+      if (!draftDbId) throw new Error('NOTION_BLOG_AUTO_DRAFT_DB_ID missing');
+
       const draftPage = await notion.pages.create({
-        parent: { database_id: DB_IDS.DRAFT },
+        parent: { database_id: draftDbId },
         properties: {
           Title: {
             title: [{ text: { content: draftData.outline?.split('\n')[0]?.replace(/^#+\s*/, '') || sourceTitle } }],
@@ -156,10 +162,17 @@ export async function runDraftRunner(): Promise<DraftResult> {
       // "Playfish" -> Blog-Playfish
       // "FIRE" -> Blog-FIRE
       // "Immigrant" -> Blog-Immigrant
-      let targetDbId = DB_IDS.BLOG_PLAYFISH; // Default: Blog-Playfish
-      if (targetBlog === 'FIRE') targetDbId = DB_IDS.BLOG_FIRE;
-      if (targetBlog === 'Immigrant') targetDbId = DB_IDS.BLOG_IMMIGRATION;
-      if (targetBlog === 'Playfish') targetDbId = DB_IDS.BLOG_PLAYFISH; // Explicit mapping
+      let targetDbId = process.env.NOTION_PLAYFISH_DB_ID; // Default
+      
+      if (targetBlog === 'FIRE') targetDbId = process.env.NOTION_FIRE_DB_ID;
+      if (targetBlog === 'Immigrant') targetDbId = process.env.NOTION_IMMIGRATION_DB_ID;
+      if (targetBlog === 'Playfish') targetDbId = process.env.NOTION_PLAYFISH_DB_ID;
+
+      console.log(`Target Blog: ${targetBlog} | Target DB ID: ${targetDbId}`);
+
+      if (!targetDbId) {
+        throw new Error(`Target Database ID not found for blog theme: "${targetBlog}". Check environment variables (NOTION_..._DB_ID).`);
+      }
 
       // 6. Generate SEO (PF-SEO)
       console.log('Generating SEO (PF-SEO)...');
@@ -205,11 +218,11 @@ export async function runDraftRunner(): Promise<DraftResult> {
       // Need to split draft content into blocks (Notion has 2000 char limit per block)
       // For simplicity, we'll put the whole draft in one or few paragraph blocks.
       // Better implementation would parse Markdown to Blocks, but for now simple text.
-      const contentBlocks = [];
-      const MAX_CHUNK_LENGTH = 1800;
+      const blogContentBlocks = [];
+      // Reusing MAX_CHUNK_LENGTH from above
       const draftText = draftData.draft || '';
       for (let i = 0; i < draftText.length; i += MAX_CHUNK_LENGTH) {
-        contentBlocks.push({
+        blogContentBlocks.push({
           object: 'block',
           type: 'paragraph',
           paragraph: {
@@ -224,8 +237,8 @@ export async function runDraftRunner(): Promise<DraftResult> {
           Title: {
             title: [{ text: { content: draftData.outline?.split('\n')[0]?.replace(/^#+\s*/, '') || sourceTitle } }],
           },
-          Language: {
-            select: { name: '简体中文' },
+          Lang: {
+            select: { name: 'zh-hans' },
           },
           SourceID: {
             rich_text: [{ text: { content: sourceId } }],
@@ -246,7 +259,7 @@ export async function runDraftRunner(): Promise<DraftResult> {
             rich_text: [{ text: { content: seoData.Keywords || '' } }],
           },
         },
-        children: contentBlocks,
+        children: blogContentBlocks,
       });
 
       // 8. Update Source DB (Mark as Used)

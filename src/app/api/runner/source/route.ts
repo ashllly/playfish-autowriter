@@ -7,9 +7,15 @@ import { runSourceRunner } from '@/services/source-runner';
  * In development: Skip auth if env vars are not set
  */
 function verifyAuth(request: Request): boolean {
-  // In development, allow skipping auth if env vars are not configured
+  // In development, allow skipping auth if SKIP_AUTH is set or env vars are not configured
   if (process.env.NODE_ENV === 'development') {
-    if (!process.env.BASIC_AUTH_USERNAME || !process.env.BASIC_AUTH_PASSWORD) {
+    if (process.env.SKIP_AUTH === 'true') {
+      console.warn('⚠️  SKIP_AUTH=true. Allowing access in development mode.');
+      return true;
+    }
+    const username = process.env.BASIC_AUTH_USERNAME?.trim();
+    const password = process.env.BASIC_AUTH_PASSWORD?.trim();
+    if (!username || !password) {
       console.warn('⚠️  Basic Auth not configured. Allowing access in development mode.');
       return true;
     }

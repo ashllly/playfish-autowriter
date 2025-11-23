@@ -170,7 +170,7 @@ GPT 判断 TargetBlog (Immigrant/Playfish/FIRE) - 对应 Notion DB: Blog-Immigra
 | **Slug** | Text | 自动 | autowriter 或 blog 生成 |
 | **SourceID** | Text | 手动/自动 | 方便追溯 |
 | **DraftID** | Text | 手动/自动 | 方便追溯 |
-| **Language** | Select | 手动/自动 | 语言标签：简体中文 / 繁体中文 / English |
+| **Lang** | Select | 手动/自动 | 语言标签：zh-hans / zh-hant / en |
 | **Content** | Page Content | 手动 | 正文内容 |
 | **meta-title** | Text | 自动 | SEO 标题 (PF-SEO 生成) |
 | **Description** | Text | 自动 | SEO 描述 (PF-SEO 生成) |
@@ -242,7 +242,7 @@ GPT 判断 TargetBlog (Immigrant/Playfish/FIRE) - 对应 Notion DB: Blog-Immigra
 4. **自动将 Draft 中的正文部分，贴入对应博客数据库（三个博客主题中的一个）：**
    - 标题 → Blog DB 的 Title 字段
    - 正文 → Blog DB 的 Content 字段
-   - 语言 → Blog DB 的 Language = "简体中文"
+   - 语言 → Blog DB 的 Lang = "zh-hans"
    - SourceID、DraftID → 对应字段
 
 5. **触发命令集 PF-SEO，自动写入对应博客数据库的 SEO 信息：**
@@ -318,11 +318,11 @@ OPENAI_PROJECT_ID=
 
 # Notion
 NOTION_API_TOKEN=
-NOTION_SOURCE_DB_ID=
-NOTION_DRAFT_DB_ID=
-NOTION_BLOG_PLAYFISH_DB_ID=      # 摸鱼主题 (Notion DB: Blog-Playfish)
-NOTION_BLOG_FIRE_DB_ID=      # FIRE 主题 (Notion DB: Blog-FIRE)
-NOTION_BLOG_IMMIGRATION_DB_ID= # 移民主题 (Notion DB: Blog-Immigrant)
+NOTION_BLOG_SOURCE_DB_ID=
+NOTION_BLOG_AUTO_DRAFT_DB_ID=
+NOTION_PLAYFISH_DB_ID=      # 摸鱼主题 (Notion DB: Blog-Playfish)
+NOTION_FIRE_DB_ID=      # FIRE 主题 (Notion DB: Blog-FIRE)
+NOTION_IMMIGRATION_DB_ID= # 移民主题 (Notion DB: Blog-Immigrant)
 NOTION_WEBHOOK_SECRET=
 
 # Cloudflare R2 Storage (for images)
@@ -378,11 +378,11 @@ PLAYFISH_DEPLOY_WEBHOOK_URL=
 ### 数据库字段命名
 - **Source DB**: Title, SourceID, Send (Checkbox), Used (Checkbox), Created time, Last edited time, Page Content
 - **Draft DB**: Title, TargetBlog (Select: Immigrant/Playfish/FIRE，对应 Notion DB: Blog-Immigrant / Blog-Playfish / Blog-FIRE), SourceID, DraftID, Created time, Last edited time, Page Content
-- **Blog DB**: Title, Slug, SourceID, DraftID, Language (Select: 简体中文/繁体中文/English), Content, meta-title, Description, Keywords, Cover, Published, PublicationDate, Created time, Last edited time
+- **Blog DB**: Title, Slug, SourceID, DraftID, Lang (Select: zh-hans/zh-hant/en), Content, meta-title, Description, Keywords, Cover, Published, PublicationDate, Created time, Last edited time
 
 ### 语言区分方式
 - **不是通过不同的数据库区分语言**
-- **而是通过 Blog DB 中的 Language 字段（Select）来区分**
+- **而是通过 Blog DB 中的 Lang 字段（Select）来区分**
 - 三个 Blog DB 分别对应三个主题：摸鱼、FIRE、移民
 
 ### 图片存储
