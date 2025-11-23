@@ -315,7 +315,7 @@ export async function runDraftRunner(): Promise<DraftResult> {
       console.log('Draft Flow Completed for page ' + pageId);
       
       // Collect result info
-      const articleTitle = draftData.outline?.split('\n')[0]?.replace(/^#+\s*/, '') || sourceTitle;
+      // articleTitle is already defined above
       results.push({
         title: articleTitle,
         targetBlog: targetBlog,
