@@ -8,6 +8,12 @@ type DraftResult = {
   errors?: string[];
   message?: string;
   warning?: string;
+  results?: Array<{
+    title: string;
+    targetBlog: string;
+    draftId: string;
+    sourceId: string;
+  }>;
 };
 
 export async function runDraftRunner(): Promise<DraftResult> {
@@ -46,6 +52,7 @@ export async function runDraftRunner(): Promise<DraftResult> {
 
   let processedCount = 0;
   const errors: string[] = [];
+  const results: Array<{ title: string; targetBlog: string; draftId: string; sourceId: string }> = [];
 
   for (const page of pages) {
     const p = page as any;
@@ -56,7 +63,10 @@ export async function runDraftRunner(): Promise<DraftResult> {
     const sourceIdProp = p.properties.SourceID || p.properties.sourceid; // try case insensitive
     const sourceId = sourceIdProp?.rich_text[0]?.plain_text || `src_${nanoid(8)}`;
 
-    console.log(`Processing Source Page: ${sourceTitle} (${pageId})`);
+    // Get Manual TargetBlog if exists
+    const manualTargetBlog = p.properties.TargetBlog?.select?.name;
+
+    console.log(`Processing Source Page: ${sourceTitle} (${pageId}) ${manualTargetBlog ? `[Target: ${manualTargetBlog}]` : ''}`);
 
     try {
       // 2. Get Content (Text + Images)
@@ -64,6 +74,11 @@ export async function runDraftRunner(): Promise<DraftResult> {
       
       // Combine text and image URLs for the prompt
       let promptContent = `Title: ${sourceTitle}\n\nContent:\n${content.text}`;
+      
+      if (manualTargetBlog) {
+        promptContent += `\n\n[IMPORTANT INSTRUCTION]\nUser has explicitly assigned this content to the "${manualTargetBlog}" blog theme. Please ensure the writing style, tone, and audience analysis (STEP 1) are perfectly tailored for the "${manualTargetBlog}" theme.`;
+      }
+
       if (content.imageUrls.length > 0) {
         promptContent += `\n\n[Image Content Available: ${content.imageUrls.length} images found but not directly processed in text rewrite step unless Vision model used. For now, rely on text extraction if any.]`;
         // Note: Ideally we would use Vision here too if the text is empty, 
@@ -97,9 +112,10 @@ export async function runDraftRunner(): Promise<DraftResult> {
 
       const draftId = `draft_${nanoid(8)}`;
       // targetBlog values: "Playfish", "FIRE", "Immigrant" (matching Notion DB names)
-      const targetBlog = draftData.targetBlog || 'Playfish'; // Default fallback
+      // Priority: Manual TargetBlog > AI Detected > Default
+      const targetBlog = manualTargetBlog || draftData.targetBlog || 'Playfish';
 
-      console.log(`Draft Generated. Target: ${targetBlog}`);
+      console.log(`Draft Generated. Target: ${targetBlog} ${manualTargetBlog ? '(Manual Override)' : '(AI Detected)'}`);
 
       // 4. Create Entry in Draft DB
       console.log('Writing to Draft DB...');
@@ -187,6 +203,15 @@ export async function runDraftRunner(): Promise<DraftResult> {
       const hotKeywords = ''; // Can be enhanced later to extract from angle/thinkLog
       const blogTheme = targetBlog; // Playfish, FIRE, or Immigrant
       
+      // Select available tags based on blogTheme
+      const availableTags = BLOG_TAGS[blogTheme as keyof typeof BLOG_TAGS] || [];
+
+      // Determine Section based on targetBlog (for website routing)
+      let sectionValue = 'playfish';
+      if (targetBlog === 'FIRE') sectionValue = 'fire';
+      else if (targetBlog === 'Immigrant') sectionValue = 'immigrant';
+      else if (targetBlog === 'Playfish') sectionValue = 'playfish';
+
       const seoCompletion = await openai.chat.completions.create({
         model: MODELS.SEO,
         messages: [
@@ -198,6 +223,7 @@ export async function runDraftRunner(): Promise<DraftResult> {
               ArticleContent: articleContent.substring(0, 5000), // Limit content length
               HotKeywords: hotKeywords,
               BlogTheme: blogTheme,
+              AvailableTags: availableTags.join(', '),
               OptionalNotes: ''
             }, null, 2)
           },
@@ -210,7 +236,9 @@ export async function runDraftRunner(): Promise<DraftResult> {
         Slug: '', 
         'meta-title': '', 
         Description: '', 
-        Keywords: '' 
+        Keywords: '',
+        Tag: [],
+        TagSlug: ''
       };
 
       // 7. Create Entry in Blog DB
@@ -259,8 +287,17 @@ export async function runDraftRunner(): Promise<DraftResult> {
           Keywords: {
             rich_text: [{ text: { content: seoData.Keywords || '' } }],
           },
+          Tag: {
+            multi_select: (Array.isArray(seoData.Tag) ? seoData.Tag : []).map((t: string) => ({ name: t })),
+          },
+          TagSlug: {
+            rich_text: [{ text: { content: seoData.TagSlug || '' } }],
+          },
+          Section: {
+            select: { name: sectionValue },
+          },
         },
-        children: blogContentBlocks,
+        children: blogContentBlocks as BlockObjectRequest[],
       });
 
       // 8. Update Source DB (Mark as Used)
@@ -276,6 +313,15 @@ export async function runDraftRunner(): Promise<DraftResult> {
 
       processedCount++;
       console.log('Draft Flow Completed for page ' + pageId);
+      
+      // Collect result info
+      const articleTitle = draftData.outline?.split('\n')[0]?.replace(/^#+\s*/, '') || sourceTitle;
+      results.push({
+        title: articleTitle,
+        targetBlog: targetBlog,
+        draftId: draftId,
+        sourceId: sourceId,
+      });
 
     } catch (error: any) {
       console.error(`Failed to process page ${pageId}:`, error);
@@ -285,7 +331,8 @@ export async function runDraftRunner(): Promise<DraftResult> {
 
   return { 
     processed: processedCount, 
-    errors: errors.length > 0 ? errors : undefined 
+    errors: errors.length > 0 ? errors : undefined,
+    results: results.length > 0 ? results : undefined,
   };
 }
 

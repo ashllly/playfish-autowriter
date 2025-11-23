@@ -224,6 +224,26 @@ export default function DashboardPage() {
                   }`}>
                     {draftResult.warning ? '⚠️ Warning' : '✅ Success'}: {draftResult.message}
                   </p>
+                  
+                  {/* Display detailed results */}
+                  {draftResult.data?.results && draftResult.data.results.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-green-200">
+                      <p className="text-xs font-semibold text-gray-700 mb-2">生成的文章：</p>
+                      {draftResult.data.results.map((item: any, idx: number) => (
+                        <div key={idx} className="mb-2 p-2 bg-white rounded border border-gray-200">
+                          <p className="text-xs font-medium text-gray-900">{item.title}</p>
+                          <div className="mt-1 flex items-center gap-3 text-xs text-gray-600">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800">
+                              {item.targetBlog}
+                            </span>
+                            <span className="text-gray-500">Draft ID: <code className="text-xs">{item.draftId}</code></span>
+                            <span className="text-gray-500">Source ID: <code className="text-xs">{item.sourceId}</code></span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
                   {draftResult.data && (
                     <div className="mt-2">
                       <p className="text-xs font-semibold text-gray-600 mb-1">处理结果:</p>

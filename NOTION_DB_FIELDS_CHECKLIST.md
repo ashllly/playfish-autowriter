@@ -9,6 +9,7 @@
 | 字段名 | 类型 | 必填 | 自动/手动 | 说明 | 示例值 |
 |--------|------|------|-----------|------|--------|
 | **Title** | Title | ✅ | 自动 | 从正文自动生成的小红书标题 | "如何避免情绪内耗" |
+| **TargetBlog** | Select | ☐ | 手动 | 手动指定目标博客，防止 AI 误判 | `Playfish` / `FIRE` / `Immigrant` |
 | **SourceID** | Text (Rich Text) | ✅ | 自动 | 唯一标识符 | `src_abc12345` |
 | **Send** | Checkbox | ✅ | 手动 | 勾选后触发 Draft Runner | ☑️ / ☐ |
 | **Used** | Checkbox | ✅ | 自动 | 勾选表示已生成 Draft | ☑️ / ☐ |
@@ -22,7 +23,12 @@
    - 这是 Notion 的默认 Title 字段
    - 系统会自动生成，用户也可以手动修改
 
-2. **SourceID** (Text 类型，Rich Text)
+2. **TargetBlog** (Select 类型)
+   - 用户手动指定
+   - 选项值必须精确匹配：`Playfish` / `FIRE` / `Immigrant`
+   - 如果手动指定了此值，后续流程将强制使用此值，忽略 AI 的判断
+
+3. **SourceID** (Text 类型，Rich Text)
    - 格式：`src_` + 8位随机字符
    - 用于追踪和关联
 
@@ -126,15 +132,94 @@
 
 ---
 
+## 🟥 Blog DB (Blog-Playfish / Blog-FIRE / Blog-Immigrant) 字段清单
+
+### 基础字段（必需）
+
+| 字段名 | 类型 | 必填 | 自动/手动 | 说明 | 选项值 |
+|--------|------|------|-----------|------|--------|
+| **Title** | Title | ✅ | 自动 | 文章标题（从 Draft DB 提取） | "如何避免情绪内耗" |
+| **Slug** | Text (Rich Text) | ✅ | 自动 | SEO 友好 URL 片段 | "avoid-emotional-burnout" |
+| **SourceID** | Text (Rich Text) | ✅ | 自动 | 对应 Source DB 的 SourceID | `src_abc12345` |
+| **DraftID** | Text (Rich Text) | ✅ | 自动 | 对应 Draft DB 的 DraftID | `draft_xyz67890` |
+| **Lang** | Select | ✅ | 自动 | 语言标签 | `zh-hans` / `zh-hant` / `en` |
+| **Content** | Page Content | ✅ | 自动 | 文章正文内容（从 Draft DB 提取） | (Markdown 格式) |
+| **meta-title** | Text (Rich Text) | ✅ | 自动 | SEO 标题 | "如何走出低谷：实用的自我恢复方法" |
+| **Description** | Text (Rich Text) | ✅ | 自动 | SEO 描述 | "本文从实操角度介绍..." |
+| **Keywords** | Text (Rich Text) | ✅ | 自动 | SEO 关键词 | "情绪管理, 内耗, 自我提升" |
+| **Tag** | Multi-select | ⚠️ | 自动 | 文章标签 | `摸鱼艺术`, `时间管理` |
+| **TagSlug** | Text (Rich Text) | ⚠️ | 自动 | 标签对应的 URL Slug | `art-of-fish, time-management` |
+| **Section** | Select | ✅ | 自动 | 网站发布板块 | `playfish` / `fire` / `immigrant` |
+| **Cover** | URL | ☐ | 手动 | AI 封面图 URL | `https://r2.cloudflarestorage.com/...` |
+| **Published** | Checkbox | ✅ | 手动 | 勾选 = 开始自动化发布流程 | ✅ / ☐ |
+| **PublicationDate** | Date | ✅ | 自动 | 发布时间戳 | 自动 |
+| **Created time** | Created Time | ✅ | 自动 | Notion 默认字段 | 自动 |
+| **Last edited time** | Last Edited Time | ✅ | 自动 | Notion 默认字段 | 自动 |
+
+### 字段配置说明：
+
+1. **Title** (Title 类型)
+   - 从 Draft DB 的 `outline` 第一行提取
+
+2. **Slug** (Text 类型，Rich Text)
+   - 由 PF-SEO 生成
+
+3. **SourceID** (Text 类型，Rich Text)
+   - 从 Draft DB 复制过来
+
+4. **DraftID** (Text 类型，Rich Text)
+   - 从 Draft DB 复制过来
+
+5. **Lang** (Select 类型)
+   - ⚠️ **重要**：选项值必须精确匹配：`zh-hans` / `zh-hant` / `en`
+   - 默认写入 `zh-hans`
+
+6. **Content** (Page Content)
+   - 从 Draft DB 的 `draft` 部分提取
+
+7. **meta-title** (Text 类型，Rich Text)
+   - 由 PF-SEO 生成
+
+8. **Description** (Text 类型，Rich Text)
+   - 由 PF-SEO 生成
+
+9. **Keywords** (Text 类型，Rich Text)
+   - 由 PF-SEO 生成
+
+10. **Tag** (Multi-select 类型)
+    - 由 PF-SEO 生成，优先匹配预定义列表
+
+11. **TagSlug** (Text 类型，Rich Text)
+    - 由 PF-SEO 生成，对应 Tag 的 Slug (逗号分隔)
+
+12. **Section** (Select 类型)
+    - 网站发布板块，用于前端路由
+    - 自动映射规则：
+      - TargetBlog="Playfish" -> `playfish`
+      - TargetBlog="FIRE" -> `fire`
+      - TargetBlog="Immigrant" -> `immigrant`
+    - 选项值必须为全小写
+
+13. **Cover** (URL 类型)
+    - 用户手动粘贴图片 URL
+
+13. **Published** (Checkbox)
+    - 用户手动勾选，触发发布流程
+
+14. **PublicationDate** (Date 类型)
+    - 系统自动写入发布时间
+
+---
+
 ## ⚠️ 重要注意事项
 
 ### 1. TargetBlog 字段配置
 - **字段类型**：Select（下拉选择）
 - **选项值必须精确匹配**：
-  - ✅ `PlayFish` (P 和 F 大写)
+  - ✅ `Playfish` (只有 P 大写)
   - ✅ `FIRE` (全大写)
   - ✅ `Immigrant` (首字母大写)
-- ❌ **不要使用**：`Playfish`、`playfish`、`MoYu`、`Immigration` 等
+- ❌ **不要使用**：`PlayFish` (P 和 F 大写)、`MoYu`、`Immigration` 等
 
 ### 2. 字段名大小写
 - 代码中使用的字段名：
@@ -163,7 +248,8 @@
 ### Source DB 创建步骤：
 1. 创建新的 Database
 2. 添加 Title 字段（默认已有）
-3. 添加 Text 字段，命名为 `SourceID`
+3. 添加 Select 字段，命名为 `TargetBlog` (选项: `Playfish`, `FIRE`, `Immigrant`)
+4. 添加 Text 字段，命名为 `SourceID`
 4. 添加 Checkbox 字段，命名为 `Send`
 5. 添加 Checkbox 字段，命名为 `Used`
 6. Created time 和 Last edited time 是 Notion 默认字段，自动存在
@@ -177,14 +263,23 @@
 5. 添加 Text 字段，命名为 `DraftID`
 6. Created time 和 Last edited time 是 Notion 默认字段，自动存在
 
+### Blog DB 创建步骤（Playfish / FIRE / Immigrant）：
+1. 创建新的 Database
+2. 添加基础字段：`Title`, `Slug`, `SourceID`, `DraftID`, `Lang`, `meta-title`, `Description`, `Keywords`
+3. 添加 **Tag** (Multi-select) 和 **TagSlug** (Text)
+4. 添加 **Section** (Select, 选项: `playfish`, `fire`, `immigrant`)
+5. 添加 `Cover` (URL), `Published` (Checkbox), `PublicationDate` (Date)
+6. Created time 和 Last edited time 是 Notion 默认字段，自动存在
+
 ---
 
 ## ✅ 验证清单
 
 创建完成后，请验证：
 
-- [ ] Source DB 有 `Title`、`SourceID`、`Send`、`Used` 字段
+- [ ] Source DB 有 `Title`、`TargetBlog`、`SourceID`、`Send`、`Used` 字段
 - [ ] Draft DB 有 `Title`、`TargetBlog`、`SourceID`、`DraftID` 字段
+- [ ] Blog DB 有 `Tag` (Multi-select) 和 `TagSlug` (Text) 字段
 - [ ] `TargetBlog` 的选项值完全匹配：`Playfish`（只有 P 大写）、`FIRE`、`Immigrant`
 - [ ] 字段名大小写正确（驼峰命名）
 - [ ] 所有字段类型正确

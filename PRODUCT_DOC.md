@@ -175,6 +175,9 @@ GPT 判断 TargetBlog (Immigrant/Playfish/FIRE) - 对应 Notion DB: Blog-Immigra
 | **meta-title** | Text | 自动 | SEO 标题 (PF-SEO 生成) |
 | **Description** | Text | 自动 | SEO 描述 (PF-SEO 生成) |
 | **Keywords** | Text | 自动 | SEO 关键词 (PF-SEO 生成) |
+| **Tag** | Multi-select | 自动 | 文章标签（优先匹配预定义列表） |
+| **TagSlug** | Text | 自动 | 标签对应的 URL Slug（逗号分隔） |
+| **Section** | Select | 自动 | 网站发布板块 (playfish / fire / immigrant) |
 | **Cover** | URL | 自动 | AI 封面图 URL（存储在 Cloudflare R2） |
 | **Published** | Checkbox | 手动 | 勾选 = 开始自动化发布流程 |
 | **PublicationDate** | Date | 自动 | 发布时间戳 |
@@ -188,6 +191,28 @@ GPT 判断 TargetBlog (Immigrant/Playfish/FIRE) - 对应 Notion DB: Blog-Immigra
 - 用户手动勾选 Published 后：
   - 触发：简体版文章发布到 Playfish 主网站（这是 Playfish 主网站 project 功能，与 autowriter 不互相影响）
   - 触发：翻译成多语言（EN/繁体）- 将创建相应命令集
+
+### 🏷️ 预定义标签系统（Tag System）
+
+PF-SEO 将优先从以下列表中选择标签。如果都不合适，GPT 可以在 Draft 的思考日志中建议新标签，但不会直接写入 Blog DB。
+
+**1. Blog-Playfish (摸鱼主题)**
+- 摸鱼艺术 (art-of-fish)
+- 时间管理 (time-management)
+
+**2. Blog-Immigrant (移民主题)**
+- 亚洲 (asia)
+- 欧洲 (eu)
+- 北美 (na)
+- 澳洲 (au)
+
+**3. Blog-FIRE (FIRE主题)**
+- 什么是FIRE (what-is-fire)
+- 生活成本 (living-cost)
+- 理财规划 (financial-planning)
+- 医疗保险 (health-insurance)
+- 中产焦虑 (middle-class-anxiety)
+- 风险管理 (risk-management)
 
 ---
 
@@ -249,6 +274,9 @@ GPT 判断 TargetBlog (Immigrant/Playfish/FIRE) - 对应 Notion DB: Blog-Immigra
    - meta-title
    - Description
    - Keywords
+   - Tag (优先匹配预定义标签)
+   - TagSlug (对应标签的英文 Slug)
+   - Section (根据 TargetBlog 自动映射：playfish/fire/immigrant)
 
 6. **Draft 生成完成后，系统自动勾选 Source DB 的 Used**
    - 此时 `Send`=✅, `Used`=✅ -> 流程结束，不会重复触发
@@ -378,7 +406,7 @@ PLAYFISH_DEPLOY_WEBHOOK_URL=
 ### 数据库字段命名
 - **Source DB**: Title, SourceID, Send (Checkbox), Used (Checkbox), Created time, Last edited time, Page Content
 - **Draft DB**: Title, TargetBlog (Select: Immigrant/Playfish/FIRE，对应 Notion DB: Blog-Immigrant / Blog-Playfish / Blog-FIRE), SourceID, DraftID, Created time, Last edited time, Page Content
-- **Blog DB**: Title, Slug, SourceID, DraftID, Lang (Select: zh-hans/zh-hant/en), Content, meta-title, Description, Keywords, Cover, Published, PublicationDate, Created time, Last edited time
+- **Blog DB**: Title, Slug, SourceID, DraftID, Lang (Select: zh-hans/zh-hant/en), Content, meta-title, Description, Keywords, Tag, TagSlug, Section, Cover, Published, PublicationDate, Created time, Last edited time
 
 ### 语言区分方式
 - **不是通过不同的数据库区分语言**
