@@ -3,7 +3,7 @@ import { openai, MODELS } from '@/lib/openai/client';
 import { PROMPTS } from '@/lib/openai/prompts';
 import { BlockObjectRequest } from '@notionhq/client/build/src/api-endpoints';
 import { getTagName } from '@/lib/constants/tags';
-import { markdownToBlocks } from '@/lib/notion/markdown';
+import { fetchBlockTree, collectTextNodes, translateTexts, reconstructBlocks } from '@/lib/notion/block-translator';
 
 // Types
 export type TranslationTask = {
@@ -114,98 +114,293 @@ export async function scanForMissingTranslations(): Promise<TranslationTask[]> {
   return allTasks;
 }
 
-// 2. Translate Logic
+// 2. Translate Logic (BLOCK-BASED)
+// Refactored: Step 1 - Analysis
+export async function getArticleSourceData(sourcePageId: string) {
+  console.log(`🔍 Analyzing Source Page: ${sourcePageId}`);
+  
+  // 1. Fetch Source Page Properties
+  const sourcePage = await notion.pages.retrieve({ page_id: sourcePageId }) as any;
+  const props = sourcePage.properties;
+
+  // 2. Fetch Source Block Tree
+  const sourceBlocks = await fetchBlockTree(sourcePageId);
+
+  return {
+    sourcePageId,
+    props,
+    sourceBlocks
+  };
+}
+
+// Refactored: Step 2 - Execution (Batch)
+export async function translateAndWriteBatch(
+  batchIndex: number,
+  targetLang: 'en' | 'zh-hant',
+  blogTheme: string,
+  blocksBatch: any[], // Subset of top-level blocks
+  pageProperties: any, // Required for batchIndex 0
+  existingPageId?: string
+) {
+  console.log(`🚀 Processing Batch ${batchIndex} (${blocksBatch.length} blocks)...`);
+
+  // A. Extract Texts from this batch
+  const rawTexts = collectTextNodes(blocksBatch);
+  
+  // Special handling for Title in Batch 0
+  // If Batch 0, we might want to translate the title too. 
+  // However, the title is in pageProperties. 
+  // Let's assume the Title is translated separately or included in the first batch texts?
+  // Current logic: rawTexts.unshift(title).
+  // Better: Handle title translation in Batch 0 specifically.
+  
+  let translatedTitle = '';
+  if (batchIndex === 0 && pageProperties?.Title) {
+      const title = pageProperties.Title.title[0]?.plain_text || '';
+      rawTexts.unshift(title);
+  }
+
+  // B. Translate
+  // If no texts to translate (e.g. only images), skip translation
+  let translatedTexts: string[] = [];
+  if (rawTexts.length > 0) {
+      translatedTexts = await translateTexts(rawTexts, targetLang);
+  }
+
+  // Extract Title if Batch 0
+  if (batchIndex === 0 && pageProperties?.Title) {
+      translatedTitle = translatedTexts.shift() || '';
+      // Update pageProperties with translated title
+      pageProperties.Title.title[0].text.content = translatedTitle;
+  }
+
+  // C. Reconstruct Blocks
+  const newContentBlocks = reconstructBlocks(blocksBatch, translatedTexts);
+
+  // D. Write to Notion
+  if (batchIndex === 0) {
+    // Create New Page
+    const targetDbId = getDbIdByTheme(blogTheme);
+    
+    // Construct clean properties for new page creation to avoid Read-only errors
+    const newPageProperties: any = {
+      Title: {
+        title: [{ text: { content: translatedTitle } }],
+      },
+      Lang: {
+        select: { name: targetLang },
+      },
+      SourceID: {
+        rich_text: pageProperties.SourceID?.rich_text || [],
+      },
+      DraftID: {
+        rich_text: pageProperties.DraftID?.rich_text || [],
+      },
+      Slug: {
+        rich_text: pageProperties.Slug?.rich_text || [],
+      },
+      Section: {
+        select: pageProperties.Section?.select || { name: 'playfish' }, 
+      },
+      'tag-slug': {
+         multi_select: pageProperties['tag-slug']?.multi_select || [],
+      },
+      Published: {
+        checkbox: true, 
+      },
+    };
+
+    if (pageProperties.Cover?.url) {
+      newPageProperties.Cover = { url: pageProperties.Cover.url };
+    }
+    if (pageProperties.PublicationDate?.date) {
+      newPageProperties.PublicationDate = { date: pageProperties.PublicationDate.date };
+    }
+
+    // Ensure parent database
+    const newPage = await notion.pages.create({
+      parent: { database_id: targetDbId },
+      properties: newPageProperties,
+      children: newContentBlocks.slice(0, 100), // Notion limit
+    });
+    
+    // If more than 100 blocks in first batch (unlikely but possible), append rest
+    if (newContentBlocks.length > 100) {
+        await appendBlocksToPage(newPage.id, newContentBlocks.slice(100));
+    }
+
+    return { success: true, pageId: newPage.id, translatedTitle };
+  } else {
+    // Append to Existing Page
+    if (!existingPageId) throw new Error('Missing existingPageId for batch > 0');
+    
+    await appendBlocksToPage(existingPageId, newContentBlocks);
+    return { success: true, pageId: existingPageId };
+  }
+}
+
+// Refactored: Step 3 - Finalize (Meta & SEO)
+export async function finalizeTranslation(
+  pageId: string,
+  targetLang: 'en' | 'zh-hant',
+  blogTheme: string,
+  translatedTitle: string,
+  originalTagSlugs: string[]
+) {
+  console.log('✨ Finalizing (SEO & Meta)...');
+
+  // Fetch the *new* page content to generate meta
+  // (Or we could pass accumulated text, but reading fresh is safer/simpler)
+  const pageBlocks = await fetchBlockTree(pageId);
+  const allTexts = collectTextNodes(pageBlocks);
+  const contextText = allTexts.join('\n').substring(0, 3000);
+
+  const metaPrompt = PROMPTS.PF_GENERATE_META
+      .replace('{{TARGET_LANG}}', targetLang === 'en' ? 'English' : 'Traditional Chinese')
+      .replace('{{TITLE}}', translatedTitle)
+      .replace('{{CONTENT_PREVIEW}}', contextText.replace(/\n/g, ' ')) 
+      .replace('{{ORIGINAL_TAGS}}', JSON.stringify(originalTagSlugs));
+
+    const metaCompletion = await openai.chat.completions.create({
+      model: MODELS.SEO, // Use lighter model for Meta
+      messages: [
+        { role: 'user', content: metaPrompt }
+      ],
+      response_format: { type: 'json_object' },
+    });
+
+    const metaResult = JSON.parse(metaCompletion.choices[0]?.message?.content || '{}');
+
+    // Process Tags
+    const knownTagsMap: Record<string, string> = {}; 
+    originalTagSlugs.forEach((slug) => {
+       const dictName = getTagName(blogTheme, slug, targetLang);
+       if (dictName) knownTagsMap[slug] = dictName;
+    });
+
+    const gptGeneratedTagsMap = metaResult.translated_tags || {};
+    const finalTags: string[] = originalTagSlugs.map(slug => {
+      if (knownTagsMap[slug]) return knownTagsMap[slug]; 
+      if (gptGeneratedTagsMap[slug]) return gptGeneratedTagsMap[slug]; 
+      return slug;
+    });
+
+    // Update Page Properties
+    const updateProps: any = {
+      'meta-title': {
+        rich_text: [{ text: { content: metaResult.meta_title || '' } }],
+      },
+      Description: {
+        rich_text: [{ text: { content: metaResult.description || '' } }],
+      },
+      Keywords: {
+        rich_text: [{ text: { content: metaResult.keywords || '' } }],
+      },
+      Tag: {
+        multi_select: finalTags.map((t: string) => ({ name: t })), 
+      },
+      Published: {
+        checkbox: true, 
+      },
+    };
+
+    await notion.pages.update({
+        page_id: pageId,
+        properties: updateProps
+    });
+
+    return { success: true, meta: metaResult };
+}
+
 export async function translateArticle(
   sourcePageId: string,
   targetLang: 'en' | 'zh-hant',
   blogTheme: string
 ) {
-  console.log(`🌍 Translating ${sourcePageId} to ${targetLang} (${blogTheme})...`);
+  console.log(`🌍 Translating ${sourcePageId} to ${targetLang} (${blogTheme}) using Block Cloning...`);
 
   try {
-    // 1. Fetch Source Page Content & Properties
+    // 1. Fetch Source Page Properties (Keep this for Meta/Tags)
     const sourcePage = await notion.pages.retrieve({ page_id: sourcePageId }) as any;
-    const sourceContent = await getPageContent(sourcePageId);
     const props = sourcePage.properties;
 
     // Inherit Fields
     const title = props.Title?.title[0]?.plain_text || '';
     const slug = props.Slug?.rich_text[0]?.plain_text || '';
-    const coverUrl = props.Cover?.url || null; // Inherit Cover URL (not Page Cover)
-    const tagSlug = (props['tag-slug']?.multi_select || []).map((t: any) => ({ name: t.name })); // Inherit Tag Slugs
+    const coverUrl = props.Cover?.url || null;
+    const tagSlug = (props['tag-slug']?.multi_select || []).map((t: any) => ({ name: t.name }));
     const section = props.Section?.select?.name || 'playfish';
     const sourceId = props.SourceID?.rich_text[0]?.plain_text || '';
     const draftId = props.DraftID?.rich_text[0]?.plain_text || '';
-    const publicationDate = props.PublicationDate?.date?.start || null; // Inherit PublicationDate
+    const publicationDate = props.PublicationDate?.date?.start || null;
     
-    // --- NEW TAG LOGIC (Slug-Centric) ---
-    // 1. Get Source Tag Slugs (The SSOT)
+    // --- BLOCK TRANSLATION PIPELINE ---
+    
+    // A. Fetch Source Block Tree
+    console.log('Step A: Fetching Block Tree...');
+    const sourceBlocks = await fetchBlockTree(sourcePageId);
+    
+    // B. Extract Text Nodes
+    console.log('Step B: Extracting Texts...');
+    const rawTexts = collectTextNodes(sourceBlocks);
+    // Add Title to translation batch (it's not in blocks)
+    rawTexts.unshift(title); 
+    
+    // C. Translate Batch
+    console.log(`Step C: Translating ${rawTexts.length} segments...`);
+    const translatedTexts = await translateTexts(rawTexts, targetLang);
+    
+    // Extract translated Title (first item)
+    const translatedTitle = translatedTexts.shift() || title;
+    
+    // D. Reconstruct Blocks
+    console.log('Step D: Reconstructing Blocks...');
+    const newContentBlocks = reconstructBlocks(sourceBlocks, translatedTexts);
+
+    // --- SEO META GENERATION (Keep existing logic but simplify source) ---
+    console.log('Step E: Generating Meta...');
+    
+    // We use the first 3000 chars of translated text for Meta generation context
+    const contextText = translatedTexts.join('\n').substring(0, 3000);
     const sourceTagSlugs: string[] = (props['tag-slug']?.multi_select || []).map((t: any) => t.name);
-    // We do NOT look at sourceTagNames (props.Tag) anymore.
 
-    // 2. Separate Known (Dict) vs Pending (New Slugs)
-    const knownTagsMap: Record<string, string> = {}; // slug -> translated name
-    const pendingSlugsToTranslate: string[] = [];
+    const metaPrompt = PROMPTS.PF_GENERATE_META
+      .replace('{{TARGET_LANG}}', targetLang === 'en' ? 'English' : 'Traditional Chinese')
+      .replace('{{TITLE}}', translatedTitle)
+      .replace('{{CONTENT_PREVIEW}}', contextText.replace(/\n/g, ' ')) 
+      .replace('{{ORIGINAL_TAGS}}', JSON.stringify(sourceTagSlugs));
 
-    sourceTagSlugs.forEach((slug) => {
-       const dictName = getTagName(blogTheme, slug, targetLang);
-       if (dictName) {
-         knownTagsMap[slug] = dictName;
-       } else {
-         pendingSlugsToTranslate.push(slug);
-       }
-    });
-
-    // 3. Call OpenAI for Translation
-    let prompt = targetLang === 'en' ? PROMPTS.PF_TRANSLATE_EN : PROMPTS.PF_TRANSLATE_ZHT;
-
-    // Inject instruction for Pending Slugs
-    if (pendingSlugsToTranslate.length > 0) {
-      prompt += `\n\n[MANDATORY TAG GENERATION]\nWe have some new tags defined by slugs. Please generate a natural ${targetLang === 'en' ? 'English' : 'Traditional Chinese'} tag name for each slug.\nInput Slugs: ${JSON.stringify(pendingSlugsToTranslate)}\n\nIMPORTANT: Return a "translated_tags" field in your JSON response mapping the SLUG to the GENERATED TAG NAME. Example: { "translated_tags": { "ai-tools": "AI Tools" } }`;
-    }
-
-    const userContent = `Title: ${title}\n\nContent:\n${sourceContent.text}`;
-
-    const completion = await openai.chat.completions.create({
-      model: MODELS.TRANSLATE,
+    const metaCompletion = await openai.chat.completions.create({
+      model: MODELS.SEO, // Use lighter model for Meta
       messages: [
-        { role: 'system', content: prompt },
-        { role: 'user', content: userContent },
+        { role: 'user', content: metaPrompt }
       ],
       response_format: { type: 'json_object' },
     });
 
-    const resultJson = completion.choices[0]?.message?.content;
-    if (!resultJson) throw new Error('Empty translation response');
-    const translated = JSON.parse(resultJson);
+    const metaResult = JSON.parse(metaCompletion.choices[0]?.message?.content || '{}');
 
-    // 4. Construct Final Tags (Strictly following Slug order)
-    const gptGeneratedTagsMap = translated.translated_tags || {};
-    
+    // Process Tags
+    const knownTagsMap: Record<string, string> = {}; 
+    sourceTagSlugs.forEach((slug) => {
+       const dictName = getTagName(blogTheme, slug, targetLang);
+       if (dictName) knownTagsMap[slug] = dictName;
+    });
+
+    const gptGeneratedTagsMap = metaResult.translated_tags || {};
     const finalTags: string[] = sourceTagSlugs.map(slug => {
-      // Priority 1: Dictionary
-      if (knownTagsMap[slug]) return knownTagsMap[slug];
-      
-      // Priority 2: GPT Generated
-      if (gptGeneratedTagsMap[slug]) return gptGeneratedTagsMap[slug];
-      
-      // Fallback: Use Slug itself as Tag Name (better than nothing or mismatch)
+      if (knownTagsMap[slug]) return knownTagsMap[slug]; 
+      if (gptGeneratedTagsMap[slug]) return gptGeneratedTagsMap[slug]; 
       return slug;
     });
 
-    // --- END NEW TAG LOGIC ---
-
-    // 5. Create New Page in Notion
+    // --- FINAL WRITE ---
+    console.log('Step F: Writing New Page...');
     const targetDbId = getDbIdByTheme(blogTheme);
-    
-    // Parse Markdown to Blocks
-    const contentBlocks = markdownToBlocks(translated.content || '');
-    const initialBlocks = contentBlocks.slice(0, 100);
-    const remainingBlocks = contentBlocks.slice(100);
     
     const newPageProperties: any = {
       Title: {
-        title: [{ text: { content: translated.title || title } }],
+        title: [{ text: { content: translatedTitle } }],
       },
       Lang: {
         select: { name: targetLang },
@@ -217,28 +412,28 @@ export async function translateArticle(
         rich_text: [{ text: { content: draftId } }],
       },
       Slug: {
-        rich_text: [{ text: { content: slug } }], // Inherit
+        rich_text: [{ text: { content: slug } }], 
       },
       'meta-title': {
-        rich_text: [{ text: { content: translated.meta_title || '' } }],
+        rich_text: [{ text: { content: metaResult.meta_title || '' } }],
       },
       Description: {
-        rich_text: [{ text: { content: translated.description || '' } }],
+        rich_text: [{ text: { content: metaResult.description || '' } }],
       },
       Keywords: {
-        rich_text: [{ text: { content: translated.keywords || '' } }],
+        rich_text: [{ text: { content: metaResult.keywords || '' } }],
       },
       Tag: {
-        multi_select: finalTags.map((t: string) => ({ name: t })), // Use Final Merged Tags
+        multi_select: finalTags.map((t: string) => ({ name: t })), 
       },
       'tag-slug': {
-        multi_select: tagSlug, // Inherit
+        multi_select: tagSlug, 
       },
       Section: {
-        select: { name: section }, // Inherit
+        select: { name: section }, 
       },
       Published: {
-        checkbox: true, // Auto Publish
+        checkbox: true, 
       },
     };
 
@@ -254,12 +449,19 @@ export async function translateArticle(
       };
     }
 
+    // Create Page with Initial Blocks (Slice if too big? Notion create limit is 100)
+    // reconstructBlocks returns full array. We need to slice.
+    const CHUNK_SIZE = 100;
+    const initialBlocks = newContentBlocks.slice(0, CHUNK_SIZE);
+    const remainingBlocks = newContentBlocks.slice(CHUNK_SIZE);
+
     const newPage = await notion.pages.create({
       parent: { database_id: targetDbId },
       properties: newPageProperties,
       children: initialBlocks,
     });
 
+    // Append Remaining
     if (remainingBlocks.length > 0) {
        await appendBlocksToPage(newPage.id, remainingBlocks);
     }
@@ -286,12 +488,10 @@ export async function runAutoTranslation() {
     }
 
     // 2. Pick ONE task (the latest one)
-    // tasks are already sorted by publishedDate DESC in scan logic (actually sort is applied to Notion query, but scan iterates DBs)
-    // Let's sort allTasks by date just to be sure
     tasks.sort((a, b) => new Date(b.publishedDate).getTime() - new Date(a.publishedDate).getTime());
     
     const task = tasks[0];
-    const targetLang = task.missingLangs[0]; // Pick the first missing lang (e.g. 'en' before 'zh-hant')
+    const targetLang = task.missingLangs[0]; 
 
     console.log(`Selected Task: ${task.title} -> ${targetLang}`);
 

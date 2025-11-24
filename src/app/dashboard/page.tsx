@@ -201,18 +201,19 @@ export default function DashboardPage() {
     setTranslationLogs([]);
     setTranslationResults([]);
 
-    const tasks = translationScanResult; // Process all found tasks (usually limited by scan)
+    const tasks = translationScanResult; 
     
-    // Calculate total operations (some tasks might need 2 translations)
-    let totalOps = 0;
+    // Calculate total operations (tasks * langs)
+    // Note: This is now "Total Articles", not "Total API Calls"
+    let totalArticles = 0;
     tasks.forEach((t: any) => {
-      if (targetLang === 'all') totalOps += t.missingLangs.length;
-      else if (t.missingLangs.includes(targetLang)) totalOps += 1;
+      if (targetLang === 'all') totalArticles += t.missingLangs.length;
+      else if (t.missingLangs.includes(targetLang)) totalArticles += 1;
     });
 
-    setTranslationProgress({ current: 0, total: totalOps, success: 0, fail: 0 });
+    setTranslationProgress({ current: 0, total: totalArticles, success: 0, fail: 0 });
 
-    let currentOp = 0;
+    let currentArticleIdx = 0;
 
     for (const task of tasks) {
       const langsToProcess = [];
@@ -223,41 +224,104 @@ export default function DashboardPage() {
       }
 
       for (const lang of langsToProcess) {
-        currentOp++;
-        setTranslationProgress(prev => ({ ...prev, current: currentOp }));
-        setTranslationLogs(prev => [`Translating [${currentOp}/${totalOps}]: ${task.title} -> ${lang}...`, ...prev]);
+        currentArticleIdx++;
+        const logPrefix = `[${currentArticleIdx}/${totalArticles}] ${task.title} -> ${lang}`;
+        
+        setTranslationLogs(prev => [`${logPrefix}: 🔍 Analyzing...`, ...prev]);
 
         try {
-          const res = await fetch('/api/runner/translation-manager', {
+          // --- Step 1: Analyze ---
+          const analyzeRes = await fetch('/api/translation/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sourcePageId: task.sourcePageId,
-              targetLang: lang,
-              blogTheme: task.blogTheme
-            })
+            body: JSON.stringify({ sourcePageId: task.sourcePageId })
           });
-          const data = await res.json();
+          const analyzeData = await analyzeRes.json();
 
-          if (data.success) {
-            setTranslationProgress(prev => ({ ...prev, success: prev.success + 1 }));
-            setTranslationLogs(prev => [`✅ Success: ${task.title} (${lang})`, ...prev]);
-            setTranslationResults(prev => [{ title: task.title, lang: lang, url: data.data.url }, ...prev]);
-          } else {
-            setTranslationProgress(prev => ({ ...prev, fail: prev.fail + 1 }));
-            setTranslationLogs(prev => [`❌ Failed: ${task.title} (${lang}) - ${data.error}`, ...prev]);
-            setTranslationResults(prev => [{ title: task.title, lang: lang, error: data.error }, ...prev]);
+          if (!analyzeData.success) {
+            throw new Error(analyzeData.error || 'Analysis failed');
           }
+
+          const { sourceBlocks, props } = analyzeData.data;
+          
+          // --- Step 2: Batch Execution ---
+          const BATCH_SIZE = 10;
+          const totalBatches = Math.ceil(sourceBlocks.length / BATCH_SIZE);
+          let newPageId = '';
+          let translatedTitle = '';
+
+          for (let batchIdx = 0; batchIdx < totalBatches; batchIdx++) {
+            const start = batchIdx * BATCH_SIZE;
+            const end = start + BATCH_SIZE;
+            const batchBlocks = sourceBlocks.slice(start, end);
+            
+            const progressPercent = Math.round((batchIdx / totalBatches) * 100);
+            setTranslationLogs(prev => {
+                // Update top log or add new one? Simpler to add new one for detailed view
+                // Or just keep adding to top
+                return [`${logPrefix}: 🚀 Processing Batch ${batchIdx + 1}/${totalBatches} (${progressPercent}%)...`, ...prev];
+            });
+
+            const batchRes = await fetch('/api/translation/batch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    batchIndex: batchIdx,
+                    targetLang: lang,
+                    blogTheme: task.blogTheme,
+                    blocksBatch: batchBlocks,
+                    pageProperties: batchIdx === 0 ? props : undefined,
+                    existingPageId: batchIdx > 0 ? newPageId : undefined
+                })
+            });
+            
+            const batchData = await batchRes.json();
+            if (!batchData.success) {
+                throw new Error(`Batch ${batchIdx} failed: ${batchData.error}`);
+            }
+
+            if (batchIdx === 0) {
+                newPageId = batchData.data.pageId;
+                translatedTitle = batchData.data.translatedTitle;
+            }
+          }
+
+          // --- Step 3: Finalize ---
+          setTranslationLogs(prev => [`${logPrefix}: ✨ Finalizing (SEO)...`, ...prev]);
+          
+          const finalizeRes = await fetch('/api/translation/finalize', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({
+                 pageId: newPageId,
+                 targetLang: lang,
+                 blogTheme: task.blogTheme,
+                 translatedTitle: translatedTitle,
+                 originalTagSlugs: (props['tag-slug']?.multi_select || []).map((t: any) => t.name)
+             })
+          });
+
+          const finalizeData = await finalizeRes.json();
+          if (!finalizeData.success) {
+             throw new Error(`Finalize failed: ${finalizeData.error}`);
+          }
+
+          // Success
+          setTranslationProgress(prev => ({ ...prev, current: currentArticleIdx, success: prev.success + 1 }));
+          setTranslationLogs(prev => [`✅ Success: ${logPrefix}`, ...prev]);
+          setTranslationResults(prev => [{ title: task.title, lang: lang, url: `https://notion.so/${newPageId.replace(/-/g, '')}` }, ...prev]);
+
         } catch (err: any) {
-          setTranslationProgress(prev => ({ ...prev, fail: prev.fail + 1 }));
-          setTranslationLogs(prev => [`❌ Error: ${task.title} (${lang}) - ${err.message}`, ...prev]);
+          console.error(err);
+          setTranslationProgress(prev => ({ ...prev, current: currentArticleIdx, fail: prev.fail + 1 }));
+          setTranslationLogs(prev => [`❌ Error: ${logPrefix} - ${err.message}`, ...prev]);
           setTranslationResults(prev => [{ title: task.title, lang: lang, error: err.message }, ...prev]);
         }
       }
     }
 
     setProcessingTranslations(false);
-    setTranslationLogs(prev => [`🎉 Translation Batch Completed!`, ...prev]);
+    setTranslationLogs(prev => [`🎉 All Tasks Completed!`, ...prev]);
     runTranslationScan(); // Refresh list
   };
 
