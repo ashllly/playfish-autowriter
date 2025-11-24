@@ -1,152 +1,230 @@
 import { BlockObjectRequest, RichTextItemRequest } from '@notionhq/client/build/src/api-endpoints';
+import { marked } from 'marked';
 
-// --- Inline Parser (Bold, Italic, Link, Code) ---
-function parseRichText(text: string): RichTextItemRequest[] {
-  const tokens: RichTextItemRequest[] = [];
-  // Regex: **bold**, *italic*, `code`, [link](url)
-  const regex = /(\*\*[^*]+\*\*)|(\*[^*]+\*)|(`[^`]+`)|(\[[^\]]+\]\([^)]+\))/g;
-  
-  let lastIndex = 0;
-  let match;
+// Configure marked to use GFM (tables, etc.)
+marked.use({ gfm: true });
 
-  while ((match = regex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      tokens.push({
-        type: 'text',
-        text: { content: text.slice(lastIndex, match.index) },
-      });
-    }
+// --- Helper: Convert Inline Tokens to Notion RichText ---
+function tokensToRichText(tokens: marked.Token[]): RichTextItemRequest[] {
+  const richText: RichTextItemRequest[] = [];
 
-    const fullMatch = match[0];
-    
-    if (fullMatch.startsWith('**')) {
-      tokens.push({
-        type: 'text',
-        text: { content: fullMatch.slice(2, -2) },
-        annotations: { bold: true },
+  for (const token of tokens) {
+    if (token.type === 'text' || token.type === 'escape') {
+      const content = (token as any).text;
+      if (content) {
+          if ((token as any).tokens) {
+              richText.push(...tokensToRichText((token as any).tokens));
+          } else {
+              richText.push({ type: 'text', text: { content } });
+          }
+      }
+    } else if (token.type === 'strong') { // Bold
+      const inner = tokensToRichText((token as any).tokens || []);
+      inner.forEach(item => {
+        if (item.type === 'text') {
+            item.annotations = { ...item.annotations, bold: true };
+        }
       });
-    } else if (fullMatch.startsWith('*')) {
-      tokens.push({
-        type: 'text',
-        text: { content: fullMatch.slice(1, -1) },
-        annotations: { italic: true },
+      richText.push(...inner);
+    } else if (token.type === 'em') { // Italic
+      const inner = tokensToRichText((token as any).tokens || []);
+      inner.forEach(item => {
+        if (item.type === 'text') {
+            item.annotations = { ...item.annotations, italic: true };
+        }
       });
-    } else if (fullMatch.startsWith('`')) {
-      tokens.push({
+      richText.push(...inner);
+    } else if (token.type === 'codespan') { // Inline Code
+      richText.push({
         type: 'text',
-        text: { content: fullMatch.slice(1, -1) },
+        text: { content: (token as any).text },
         annotations: { code: true },
       });
-    } else if (fullMatch.startsWith('[')) {
-      const linkText = fullMatch.match(/\[(.*?)\]/)?.[1] || '';
-      const linkUrl = fullMatch.match(/\((.*?)\)/)?.[1] || '';
-      tokens.push({
-        type: 'text',
-        text: { content: linkText, link: { url: linkUrl } },
+    } else if (token.type === 'link') { // Link
+      const inner = tokensToRichText((token as any).tokens || []);
+      const url = (token as any).href;
+      inner.forEach(item => {
+        if (item.type === 'text') {
+            item.text.link = { url };
+        }
       });
+      richText.push(...inner);
+    } else if (token.type === 'image') { 
+       // Inline image in text - treat as text caption for now or ignore
+       // Notion doesn't support inline images in paragraphs
+       richText.push({ type: 'text', text: { content: `[Image: ${(token as any).text}]` } });
+    } else if (token.type === 'br') {
+        richText.push({ type: 'text', text: { content: '\n' } });
+    } else {
+       const raw = (token as any).raw || (token as any).text || '';
+       richText.push({ type: 'text', text: { content: raw } });
     }
-
-    lastIndex = regex.lastIndex;
   }
 
-  if (lastIndex < text.length) {
-    tokens.push({
-      type: 'text',
-      text: { content: text.slice(lastIndex) },
-    });
-  }
+  // Merge adjacent plain text nodes
+  const merged: RichTextItemRequest[] = [];
+  let current: RichTextItemRequest | null = null;
 
-  return tokens.length > 0 ? tokens : [{ type: 'text', text: { content: text } }];
+  for (const item of richText) {
+      if (!current) {
+          current = item;
+          continue;
+      }
+      const sameAnnotations = JSON.stringify(current.annotations) === JSON.stringify(item.annotations);
+      const sameLink = JSON.stringify(current.text?.link) === JSON.stringify(item.text?.link);
+      
+      if (current.type === 'text' && item.type === 'text' && sameAnnotations && sameLink) {
+          current.text.content += item.text.content;
+      } else {
+          merged.push(current);
+          current = item;
+      }
+  }
+  if (current) merged.push(current);
+
+  return merged.length > 0 ? merged : [{ type: 'text', text: { content: '' } }];
 }
 
-// --- Block Parser (Robust V2) ---
+// --- Main Parser: Markdown to Blocks ---
 export function markdownToBlocks(markdown: string): BlockObjectRequest[] {
-  // Debug Log for Development
+  // Debug Log
   if (process.env.NODE_ENV === 'development') {
-    // console.log('[MarkdownParser] Input Preview:', markdown.substring(0, 100).replace(/\n/g, '\\n'));
+    console.log('[MarkdownParser AST] Parsing content length:', markdown.length);
   }
 
   const blocks: BlockObjectRequest[] = [];
-  const lines = markdown.split(/\r?\n/);
+  const tokens = marked.lexer(markdown);
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const trimmed = line.trim();
-
-    if (!trimmed) continue;
-
-    // 1. Image Check (Priority High)
-    // Relaxed Regex: ^!\[(.*?)\]\((.*?)\)
-    // Allows trailing spaces.
-    const imgMatch = trimmed.match(/^!\[(.*?)\]\((.*?)\)/);
-    if (imgMatch) {
-      blocks.push({
-        object: 'block',
-        type: 'image',
-        image: {
-          type: 'external',
-          external: { url: imgMatch[2].trim() },
-          caption: imgMatch[1] ? [{ type: 'text', text: { content: imgMatch[1] } }] : [],
-        }
-      });
-      continue;
-    }
-
-    // 2. Heading Check (Unified & Robust)
-    // Matches: # Title, ##Title, ###  Title  ###
-    // Captures: 1=hashes, 2=content
-    const headingMatch = trimmed.match(/^(#{1,3})\s*(.*?)(?:\s*#+)?$/);
-    if (headingMatch) {
-      const level = headingMatch[1].length;
-      let content = headingMatch[2].trim();
+  for (const token of tokens) {
+    if (token.type === 'heading') {
+      const depth = token.depth;
+      const richText = tokensToRichText(token.tokens || []);
       
-      // Cleanup: Remove bold/italic wrapping if GPT did `## **Title**`
-      // Notion headings are styled by default, redundant formatting can look messy
-      content = content.replace(/^\*\*(.*)\*\*$/, '$1').replace(/^\*(.*)\*$/, '$1');
-
-      if (level === 1) {
-        blocks.push({ object: 'block', type: 'heading_1', heading_1: { rich_text: parseRichText(content) } });
-      } else if (level === 2) {
-        blocks.push({ object: 'block', type: 'heading_2', heading_2: { rich_text: parseRichText(content) } });
-      } else if (level === 3) {
-        blocks.push({ object: 'block', type: 'heading_3', heading_3: { rich_text: parseRichText(content) } });
+      if (depth === 1) {
+        blocks.push({ object: 'block', type: 'heading_1', heading_1: { rich_text: richText } });
+      } else if (depth === 2) {
+        blocks.push({ object: 'block', type: 'heading_2', heading_2: { rich_text: richText } });
+      } else {
+        blocks.push({ object: 'block', type: 'heading_3', heading_3: { rich_text: richText } });
       }
-      continue;
+    } 
+    else if (token.type === 'paragraph') {
+      // Check for standalone image wrapped in paragraph
+      if (token.tokens && token.tokens.length === 1 && token.tokens[0].type === 'image') {
+          const imgToken = token.tokens[0] as marked.Tokens.Image;
+          blocks.push({
+            object: 'block',
+            type: 'image',
+            image: {
+                type: 'external',
+                external: { url: imgToken.href },
+                caption: imgToken.text ? [{ type: 'text', text: { content: imgToken.text } }] : [],
+            }
+          });
+      } else {
+        blocks.push({
+            object: 'block',
+            type: 'paragraph',
+            paragraph: { rich_text: tokensToRichText(token.tokens || []) }
+        });
+      }
     }
+    else if (token.type === 'list') {
+      const isOrdered = token.ordered;
+      for (const item of token.items) {
+          let itemRichText: RichTextItemRequest[] = [];
+          item.tokens.forEach(t => {
+              if (t.type === 'text') {
+                  itemRichText.push(...tokensToRichText((t as any).tokens || [{type:'text', text: t.text}]));
+              } else if (t.type === 'paragraph') {
+                   itemRichText.push(...tokensToRichText(t.tokens));
+              }
+          });
 
-    // 3. Lists & Quote
-    const ulMatch = trimmed.match(/^[-*]\s+(.+)$/);
-    const olMatch = trimmed.match(/^(\d+)\.\s+(.+)$/);
-    const quoteMatch = trimmed.match(/^>\s+(.+)$/);
-
-    if (ulMatch) {
-      blocks.push({
-        object: 'block',
-        type: 'bulleted_list_item',
-        bulleted_list_item: { rich_text: parseRichText(ulMatch[1]) },
-      });
+          if (isOrdered) {
+              blocks.push({
+                  object: 'block',
+                  type: 'numbered_list_item',
+                  numbered_list_item: { rich_text: itemRichText }
+              });
+          } else {
+               blocks.push({
+                  object: 'block',
+                  type: 'bulleted_list_item',
+                  bulleted_list_item: { rich_text: itemRichText }
+              });
+          }
+      }
     }
-    else if (olMatch) {
-      blocks.push({
-        object: 'block',
-        type: 'numbered_list_item',
-        numbered_list_item: { rich_text: parseRichText(olMatch[2]) },
-      });
+    else if (token.type === 'blockquote') {
+       const quoteText: RichTextItemRequest[] = [];
+       token.tokens?.forEach(t => {
+           if (t.type === 'paragraph') quoteText.push(...tokensToRichText(t.tokens));
+           quoteText.push({ type: 'text', text: { content: '\n' } });
+       });
+       if (quoteText.length > 0 && quoteText[quoteText.length-1].text?.content === '\n') {
+           quoteText.pop();
+       }
+       blocks.push({
+           object: 'block',
+           type: 'quote',
+           quote: { rich_text: quoteText }
+       });
     }
-    else if (quoteMatch) {
-      blocks.push({
-        object: 'block',
-        type: 'quote',
-        quote: { rich_text: parseRichText(quoteMatch[1]) },
-      });
+    else if (token.type === 'code') {
+        blocks.push({
+            object: 'block',
+            type: 'code',
+            code: {
+                language: token.lang || 'plain text',
+                rich_text: [{ type: 'text', text: { content: token.text } }]
+            }
+        });
     }
-    else {
-      // Standard Paragraph
-      blocks.push({
-        object: 'block',
-        type: 'paragraph',
-        paragraph: { rich_text: parseRichText(trimmed) },
-      });
+    else if (token.type === 'image') {
+        blocks.push({
+            object: 'block',
+            type: 'image',
+            image: {
+                type: 'external',
+                external: { url: token.href },
+                caption: token.text ? [{ type: 'text', text: { content: token.text } }] : [],
+            }
+        });
+    }
+    else if (token.type === 'table') {
+        const tableRows: BlockObjectRequest[] = [];
+        const headerCells = token.header.map(cell => tokensToRichText(cell.tokens));
+        tableRows.push({
+            object: 'block',
+            type: 'table_row',
+            table_row: { cells: headerCells }
+        });
+        for (const row of token.rows) {
+            const rowCells = row.map(cell => tokensToRichText(cell.tokens));
+             tableRows.push({
+                object: 'block',
+                type: 'table_row',
+                table_row: { cells: rowCells }
+            });
+        }
+        blocks.push({
+            object: 'block',
+            type: 'table',
+            table: {
+                table_width: token.header.length,
+                has_column_header: true,
+                has_row_header: false,
+                children: tableRows
+            }
+        });
+    }
+    else if (token.type === 'hr') {
+        blocks.push({
+            object: 'block',
+            type: 'divider',
+            divider: {}
+        });
     }
   }
 

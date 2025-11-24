@@ -143,6 +143,10 @@ export async function runDraftRunner(options?: { limit?: number, skipImage?: boo
       const draftData = JSON.parse(draftJsonStr);
       // Expected: { angle, outline, draft, thinkLog, targetBlog }
 
+      console.log('--- GPT Output Preview (Draft) ---');
+      console.log(draftData.draft?.substring(0, 500));
+      console.log('----------------------------------');
+
       const draftId = `draft_${nanoid(8)}`;
       // targetBlog values: "Playfish", "FIRE", "Immigrant" (matching Notion DB names)
       // Priority: Manual TargetBlog > AI Detected > Default

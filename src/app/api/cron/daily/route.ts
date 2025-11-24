@@ -3,6 +3,10 @@ import { runSourceRunner } from '@/services/source-runner';
 import { runDraftRunner } from '@/services/draft-runner';
 import { runAutoTranslation } from '@/services/translation-runner';
 
+// Vercel Hobby Plan max duration
+export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
+
 // Vercel Hobby Plan allows only 1 Cron Job.
 // This "Master Runner" executes tasks sequentially to fit within that limit.
 export async function GET(request: Request) {

@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { scanForMissingTranslations, translateArticle } from '@/services/translation-runner';
 
+// Allow up to 60 seconds for translation tasks on Vercel Hobby plan
+export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   try {
     const tasks = await scanForMissingTranslations();
@@ -36,4 +40,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
-

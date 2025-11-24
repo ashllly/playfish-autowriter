@@ -26,8 +26,8 @@ export const openai = new Proxy({} as OpenAI, {
 // Model constants
 export const MODELS = {
   REWRITE: 'gpt-4o', // Best model for writing
-  TRANSLATE: 'gpt-4o-mini',
-  SEO: 'gpt-4o-mini',
+  TRANSLATE: 'gpt-4o', // Upgrade for better translation quality
+  SEO: 'gpt-4o-mini', // Keep mini for SEO tasks
   CLASSIFY: 'gpt-4o-mini',
   IMAGE: 'dall-e-3',
 };

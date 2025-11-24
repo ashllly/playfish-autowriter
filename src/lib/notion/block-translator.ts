@@ -94,9 +94,17 @@ export async function translateTexts(texts: string[], targetLang: string): Promi
   // Process batches concurrently (Promise.all)
   const batchPromises = batches.map(async (batch, index) => {
     const batchId = index + 1;
+    
+    // Add instruction to prevent Simplified Chinese fallback
     const prompt = `
       You are a professional translator. 
-      Target Language: ${targetLang === 'en' ? 'English' : 'Traditional Chinese (Taiwan/HK)'}.
+      Target Language: ${targetLang === 'en' ? 'English' : 'Traditional Chinese (Taiwan/HK usage)'}.
+      
+      [IMPORTANT]
+      - If target is Traditional Chinese, NEVER use Simplified Chinese characters.
+      - If target is English, ensure natural, professional phrasing.
+      - If the source is already in the target language, return it AS IS (do not translate).
+      - DO NOT output Simplified Chinese.
       
       [TASK]
       Translate the provided array of text segments.
@@ -191,31 +199,18 @@ export function reconstructBlocks(originalBlocks: NotionBlock[], translatedTexts
           rich_text: processRichText(data.rich_text)
         };
       } else if (type === 'image') {
+        if (data.type === 'file') {
+          console.warn('⚠️ Skipping internal Notion file image to prevent broken link.');
+          continue;
+        }
+
         const imageData: any = {
           type: data.type,
           caption: processRichText(data.caption || [])
         };
 
         if (data.type === 'external') {
-           imageData.external = { url: data.external.url };
-        } else if (data.type === 'file') {
-           // Notion API does not support re-uploading 'file' (expiry links). 
-           // Best effort: convert to external url using the temporary url if valid, 
-           // OR warn/skip. Since these are signed AWS urls, they expire.
-           // Ideally, we should upload to R2, but that's complex.
-           // WORKAROUND: Use the signed URL as external URL (valid for ~1 hour, enough for creation?)
-           // Warning: The image will break after 1 hour on the NEW page. 
-           // But Notion usually caches external images? No, 'external' blocks rely on the source.
-           // Actually, 'external' blocks point to any public URL. 
-           // If we use the signed AWS S3 url from the source 'file', it will expire.
-           // OPTION A: Ignore images (bad).
-           // OPTION B: Copy as external (will expire).
-           // OPTION C: If we have a Cover Manager logic, maybe use that?
-           // For now, let's try mapping 'file' -> 'external' with the current URL.
-           // If the user wants permanent images, they should be hosted externally or re-uploaded.
-           
-           imageData.type = 'external'; // Force external
-           imageData.external = { url: data.file.url };
+          imageData.external = { url: data.external.url };
         }
 
         newBlock.image = imageData;

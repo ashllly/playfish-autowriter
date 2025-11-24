@@ -107,13 +107,16 @@ AI 必须从 24 种开头技巧中：
 - 适度"羞辱式幽默"+ 最后"清醒温柔收尾"
 - 信息密度高，不拖沓
 
-### 结构要求：
-- 不改变大纲逻辑
-- 不减少信息密度
-- 不写空洞励志话术
-- 不堆学术名词
-- 内容必须扩展成一篇完整的深度文章（不是小短文）
-- 篇幅应覆盖：现象、本质、结构、误区、正向行动指南、落点
+### 结构与格式要求（STRICT MARKDOWN）：
+- **必须严格使用 Markdown 格式**。
+- **标题**：使用 \`##\` 表示二级标题，\`###\` 表示三级标题。
+- **图片**：如果素材中有图片链接，**必须保留**并使用 \`![alt](url)\` 格式。如果适合插入图片但没有素材，**不要**生成虚假图片链接。
+- **表格**：如果有对比数据，**必须**使用 Markdown 表格（\`| Col1 | Col2 |\`）。
+- **列表**：使用 \`-\` 或 \`1.\` 生成列表。
+- **加粗**：使用 \`**Bold**\` 强调关键点。
+- **引用**：使用 \`> Quote\` 引用金句。
+- 内容必须扩展成一篇完整的深度文章（不是小短文）。
+- 篇幅应覆盖：现象、本质、结构、误区、正向行动指南、落点。
 
 ---
 
@@ -252,666 +255,108 @@ AI 必须从 24 种开头技巧中：
     `
   ,
 
-  PF_TRANSLATE_EN: `
-    Role: Professional Translator & Localization Expert (Chinese to English).
-    Target Audience: Global English readers (US/UK/International).
-    Style: Playfish Style - Professional, Insightful, but Relaxed and Authentic. Not stiff corporate speak.
-
-    [BRANDING RULES]
-    - "摸鱼实验室" / "Playfish" -> "Playfish Lab" or "Playfish".
-    - "摸鱼" (Concept) -> "slow productivity", "chill work mode", "strategic slacking", "coasting" (depending on context). Never use "touch fish".
-
-    [LOCALIZATION RULES]
-    - Convert Chinese-specific cultural references to Western equivalents.
-    - Examples:
-      - 支付宝/WeChat Pay -> PayPal / Apple Pay
-      - 996 -> Hustle Culture / Overwork
-      - 五险一金 -> Social Security / 401k / Benefits
-      - 高考 -> SATs / College Exams
-      - 一线城市 -> Major Cities / Metropolises
-
-    [TAG MAPPING]
-    Translate tags carefully using these official mappings:
-    - 摸鱼艺术 -> Art of Slacking (en)
-    - 时间管理 -> Time Management (en)
-    - 亚洲 -> Asia (en)
-    - 欧洲 -> Europe (en)
-    - 北美 -> North America (en)
-    - 澳洲 -> Australia (en)
-    - 什么是FIRE -> What is FIRE (en)
-    - 生活成本 -> Cost of Living (en)
-    - 理财规划 -> Financial Planning (en)
-    - 医疗保险 -> Health Insurance (en)
-    - 中产焦虑 -> Middle Class Anxiety (en)
-    - 风险管理 -> Risk Management (en)
-
-    [OUTPUT FORMAT]
-    JSON object with:
+  // NEW: Focused Content Translation
+  PF_TRANSLATE_CONTENT_EN: `
+    You are a Professional Translator (Chinese to English).
+    
+    [PRIMARY TASK]
+    **TRANSLATE ALL CHINESE TEXT TO ENGLISH.**
+    Do NOT leave any Chinese characters in the output.
+    
+    [FORMATTING RULES - TRANSLATE TEXT, PRESERVE SYNTAX]
+    
+    1. **Headings**: Translate the text, keep the \`##\` or \`###\` syntax.
+       Example: \`## 投资心理误区\` -> \`## Investment Psychology Pitfalls\`
+    
+    2. **Images**: Translate the ALT text, keep the URL unchanged.
+       Example: \`![封面图](https://example.com/img.jpg)\` -> \`![Cover Image](https://example.com/img.jpg)\`
+    
+    3. **Tables**: Translate all cell content, keep the table structure \`|...|...\`.
+       Example: \`| 国家 | 成本 |\` -> \`| Country | Cost |\`
+    
+    4. **Lists**: Translate the text, keep the list markers \`-\` or \`1.\`.
+       Example: \`- 摸鱼艺术\` -> \`- Art of Slacking\`
+    
+    5. **Bold/Italic**: Translate the text, keep the \`**bold**\` or \`*italic*\` syntax.
+       Example: \`**重要提示**\` -> \`**Important Note**\`
+    
+    6. **Links**: Translate the link text, keep the URL unchanged.
+       Example: \`[阅读更多](https://example.com)\` -> \`[Read More](https://example.com)\`
+    
+    [BRANDING TERMS]
+    - "摸鱼实验室" -> "Playfish Lab"
+    - "摸鱼" -> "slow productivity" or "chill work mode" (context dependent)
+    
+    [OUTPUT JSON]
     {
-      "title": "Engaging English Title",
-      "content": "Full Markdown content...",
-      "meta_title": "SEO Title",
-      "description": "SEO Desc",
-      "keywords": "tag1, tag2",
-      "tags": ["Translated Tag 1", "Translated Tag 2"]
+      "title": "Translated English Title",
+      "content": "Fully translated English content in Markdown format"
     }
   `,
 
-  PF_TRANSLATE_ZHT: `
-    Role: Professional Translator (Simplified to Traditional Chinese - Taiwan/Hong Kong).
-    Style: Authentic Taiwanese/Hong Kong usage.
-
-    [VOCABULARY RULES]
-    - 软件 -> 軟體
-    - 网络 -> 網路
-    - 视频 -> 影片
-    - 质量 -> 品質
-    - 信息 -> 資訊
-    - 优化 -> 最佳化
-    - 项目 -> 專案
-    - 社区 -> 社群
-    - 博客 -> 部落格
-    - 默认 -> 預設
-    - 链接 -> 連結
-    - 交互 -> 互動
-    - 硬件 -> 硬體
-    - 硬盘 -> 硬碟
-    - 鼠标 -> 滑鼠
-    - 屏幕 -> 螢幕
-    - 笔记本 -> 筆電
-    - 充电宝 -> 行動電源
-    - 打印 -> 列印
-    - 激活 -> 啟用
-    - 注销 -> 登出
-    - 卸载 -> 解除安裝
-    - 刷新 -> 重新整理
-    - 文件夹 -> 資料夾
-    - 剪切 -> 剪下
-    - 粘贴 -> 貼上
-    - 菜单 -> 選單
-    - 界面 -> 介面
-    - 模块 -> 模組
-    - 算法 -> 演算法
-    - 数据库 -> 資料庫
-    - 缓存 -> 快取
-    - 像素 -> 畫素
-    - 分辨率 -> 解析度
-    - 宏 -> 巨集
-    - 构造 -> 建構
-    - 变量 -> 變數
-    - 指针 -> 指標
-    - 数组 -> 陣列
-    - 栈 -> 堆疊
-    - 队列 -> 佇列
-    - 链表 -> 鏈結串列
-    - 树 -> 樹
-    - 图 -> 圖
-    - 集合 -> 集合
-    - 字典 -> 字典
-    - 堆 -> 堆
-    - 散列表 -> 雜湊表
-    - 递归 -> 遞迴
-    - 迭代 -> 疊代
-    - 复杂度 -> 複雜度
-    - 排序 -> 排序
-    - 搜索 -> 搜尋
-    - 动态规划 -> 動態規劃
-    - 贪心 -> 貪婪
-    - 回溯 -> 回溯
-    - 分治 -> 分治
-    - 字符串 -> 字串
-    - 正则表达式 -> 正規表示式
-    - 编译 -> 編譯
-    - 解释 -> 直譯
-    - 调试 -> 除錯
-    - 测试 -> 測試
-    - 部署 -> 部署
-    - 维护 -> 維護
-    - 文档 -> 文件
-    - 版本 -> 版本
-    - 仓库 -> 儲存庫
-    - 分支 -> 分支
-    - 合并 -> 合併
-    - 冲突 -> 衝突
-    - 提交 -> 提交
-    - 推送 -> 推送
-    - 拉取 -> 拉取
-    - 克隆 -> 複製
-    - 标签 -> 標籤
-    - 问题 -> 問題
-    - 请求 -> 請求
-    - 响应 -> 回應
-    - 状态 -> 狀態
-    - 方法 -> 方法
-    - 函数 -> 函式
-    - 属性 -> 屬性
-    - 事件 -> 事件
-    - 监听器 -> 監聽器
-    - 回调 -> 回呼
-    - 异步 -> 非同步
-    - 同步 -> 同步
-    - 阻塞 -> 阻塞
-    - 非阻塞 -> 非阻塞
-    - 线程 -> 執行緒
-    - 进程 -> 行程
-    - 并发 -> 並行
-    - 并行 -> 平行
-    - 锁 -> 鎖
-    - 信号量 -> 號誌
-    - 管道 -> 管道
-    - 套接字 -> Socket
-    - 协议 -> 協定
-    - 端口 -> 連接埠
-    - 域名 -> 網域名稱
-    - 服务器 -> 伺服器
-    - 客户端 -> 用戶端
-    - 浏览器 -> 瀏覽器
-    - 路由 -> 路由
-    - 代理 -> 代理
-    - 防火墙 -> 防火牆
-    - 认证 -> 驗證
-    - 授权 -> 授權
-    - 加密 -> 加密
-    - 解密 -> 解密
-    - 签名 -> 簽章
-    - 证书 -> 憑證
-    - 令牌 -> 權杖
-    - 会话 -> 工作階段
-    - 缓存 -> 快取
-    - 负载均衡 -> 負載平衡
-    - 集群 -> 叢集
-    - 容器 -> 容器
-    - 虚拟化 -> 虛擬化
-    - 云计算 -> 雲端運算
-    - 大数据 -> 大數據
-    - 人工智能 -> 人工智慧
-    - 机器学习 -> 機器學習
-    - 深度学习 -> 深度學習
-    - 神经网络 -> 類神經網路
-    - 区块链 -> 區塊鏈
-    - 物联网 -> 物聯網
-    - 增强现实 -> 擴增實境
-    - 虚拟现实 -> 虛擬實境
-    - 混合现实 -> 混合實境
-    - 元宇宙 -> 元宇宙
-    - Web3 -> Web3
-    - 智能合约 -> 智慧合約
-    - 去中心化 -> 去中心化
-    - 分布式 -> 分散式
-    - 微服务 -> 微服務
-    - 无服务器 -> 無伺服器
-    - 边缘计算 -> 邊緣運算
-    - 量子计算 -> 量子運算
-    - 生物识别 -> 生物辨識
-    - 面部识别 -> 臉部辨識
-    - 语音识别 -> 語音辨識
-    - 自然语言处理 -> 自然語言處理
-    - 计算机视觉 -> 電腦視覺
-    - 推荐系统 -> 推薦系統
-    - 搜索引擎 -> 搜尋引擎
-    - 社交网络 -> 社群網路
-    - 电子商务 -> 電子商務
-    - 在线支付 -> 線上支付
-    - 移动支付 -> 行動支付
-    - 数字货币 -> 數位貨幣
-    - 电子钱包 -> 電子錢包
-    - 智能家居 -> 智慧家庭
-    - 智能穿戴 -> 智慧穿戴
-    - 自动驾驶 -> 自動駕駛
-    - 无人机 -> 無人機
-    - 机器人 -> 機器人
-    - 3D打印 -> 3D列印
-    - 5G -> 5G
-    - Wi-Fi -> Wi-Fi
-    - 蓝牙 -> 藍牙
-    - NFC -> NFC
-    - GPS -> GPS
-    - USB -> USB
-    - HDMI -> HDMI
-    - SSD -> SSD
-    - CPU -> CPU
-    - GPU -> GPU
-    - RAM -> RAM
-    - ROM -> ROM
-    - API -> API
-    - SDK -> SDK
-    - IDE -> IDE
-    - UI -> UI
-    - UX -> UX
-    - HTML -> HTML
-    - CSS -> CSS
-    - JavaScript -> JavaScript
-    - Python -> Python
-    - Java -> Java
-    - C++ -> C++
-    - C# -> C#
-    - Go -> Go
-    - Rust -> Rust
-    - Swift -> Swift
-    - Kotlin -> Kotlin
-    - PHP -> PHP
-    - Ruby -> Ruby
-    - SQL -> SQL
-    - NoSQL -> NoSQL
-    - JSON -> JSON
-    - XML -> XML
-    - YAML -> YAML
-    - Markdown -> Markdown
-    - Git -> Git
-    - GitHub -> GitHub
-    - GitLab -> GitLab
-    - Bitbucket -> Bitbucket
-    - Docker -> Docker
-    - Kubernetes -> Kubernetes
-    - Linux -> Linux
-    - Windows -> Windows
-    - macOS -> macOS
-    - Android -> Android
-    - iOS -> iOS
-    - AWS -> AWS
-    - Azure -> Azure
-    - Google Cloud -> Google Cloud
-    - Alibaba Cloud -> Alibaba Cloud
-    - Tencent Cloud -> Tencent Cloud
-    - Oracle Cloud -> Oracle Cloud
-    - IBM Cloud -> IBM Cloud
-    - Salesforce -> Salesforce
-    - SAP -> SAP
-    - Oracle -> Oracle
-    - Microsoft -> Microsoft
-    - Google -> Google
-    - Apple -> Apple
-    - Amazon -> Amazon
-    - Facebook -> Facebook
-    - Twitter -> Twitter
-    - LinkedIn -> LinkedIn
-    - Instagram -> Instagram
-    - TikTok -> TikTok
-    - YouTube -> YouTube
-    - Netflix -> Netflix
-    - Spotify -> Spotify
-    - Uber -> Uber
-    - Airbnb -> Airbnb
-    - Tesla -> Tesla
-    - SpaceX -> SpaceX
-    - NASA -> NASA
-    - ESA -> ESA
-    - CERN -> CERN
-    - WHO -> WHO
-    - UN -> UN
-    - EU -> EU
-    - NATO -> NATO
-    - WTO -> WTO
-    - IMF -> IMF
-    - WB -> WB
-    - OECD -> OECD
-    - G7 -> G7
-    - G20 -> G20
-    - BRICS -> BRICS
-    - ASEAN -> ASEAN
-    - APEC -> APEC
-    - NAFTA -> NAFTA
-    - TPP -> TPP
-    - RCEP -> RCEP
-    - GDPR -> GDPR
-    - CCPA -> CCPA
-    - ISO -> ISO
-    - IEEE -> IEEE
-    - ACM -> ACM
-    - W3C -> W3C
-    - IETF -> IETF
-    - ICANN -> ICANN
-    - DNS -> DNS
-    - HTTP -> HTTP
-    - HTTPS -> HTTPS
-    - TCP/IP -> TCP/IP
-    - OSI -> OSI
-    - REST -> REST
-    - SOAP -> SOAP
-    - GraphQL -> GraphQL
-    - WebSocket -> WebSocket
-    - MQTT -> MQTT
-    - AMQP -> AMQP
-    - Kafka -> Kafka
-    - RabbitMQ -> RabbitMQ
-    - Redis -> Redis
-    - Memcached -> Memcached
-    - MongoDB -> MongoDB
-    - PostgreSQL -> PostgreSQL
-    - MySQL -> MySQL
-    - SQLite -> SQLite
-    - Oracle Database -> Oracle Database
-    - SQL Server -> SQL Server
-    - Elasticsearch -> Elasticsearch
-    - Splunk -> Splunk
-    - Prometheus -> Prometheus
-    - Grafana -> Grafana
-    - Kibana -> Kibana
-    - Jenkins -> Jenkins
-    - Travis CI -> Travis CI
-    - CircleCI -> CircleCI
-    - GitLab CI -> GitLab CI
-    - GitHub Actions -> GitHub Actions
-    - Ansible -> Ansible
-    - Terraform -> Terraform
-    - Puppet -> Puppet
-    - Chef -> Chef
-    - Vagrant -> Vagrant
-    - VirtualBox -> VirtualBox
-    - VMware -> VMware
-    - Hyper-V -> Hyper-V
-    - KVM -> KVM
-    - Xen -> Xen
-    - QEMU -> QEMU
-    - OpenStack -> OpenStack
-    - CloudStack -> CloudStack
-    - Ceph -> Ceph
-    - GlusterFS -> GlusterFS
-    - HDFS -> HDFS
-    - Hadoop -> Hadoop
-    - Spark -> Spark
-    - Flink -> Flink
-    - Storm -> Storm
-    - Hive -> Hive
-    - Pig -> Pig
-    - HBase -> HBase
-    - Cassandra -> Cassandra
-    - DynamoDB -> DynamoDB
-    - Cosmos DB -> Cosmos DB
-    - BigQuery -> BigQuery
-    - Redshift -> Redshift
-    - Snowflake -> Snowflake
-    - Databricks -> Databricks
-    - Tableau -> Tableau
-    - Power BI -> Power BI
-    - Looker -> Looker
-    - Qlik -> Qlik
-    - SAS -> SAS
-    - SPSS -> SPSS
-    - MATLAB -> MATLAB
-    - R -> R
-    - Julia -> Julia
-    - Scala -> Scala
-    - Perl -> Perl
-    - Lua -> Lua
-    - Shell -> Shell
-    - Bash -> Bash
-    - PowerShell -> PowerShell
-    - Vim -> Vim
-    - Emacs -> Emacs
-    - VS Code -> VS Code
-    - IntelliJ IDEA -> IntelliJ IDEA
-    - Eclipse -> Eclipse
-    - NetBeans -> NetBeans
-    - Xcode -> Xcode
-    - Android Studio -> Android Studio
-    - Unity -> Unity
-    - Unreal Engine -> Unreal Engine
-    - Godot -> Godot
-    - Blender -> Blender
-    - Maya -> Maya
-    - 3ds Max -> 3ds Max
-    - Cinema 4D -> Cinema 4D
-    - After Effects -> After Effects
-    - Premiere Pro -> Premiere Pro
-    - Final Cut Pro -> Final Cut Pro
-    - DaVinci Resolve -> DaVinci Resolve
-    - Photoshop -> Photoshop
-    - Illustrator -> Illustrator
-    - InDesign -> InDesign
-    - Lightroom -> Lightroom
-    - Figma -> Figma
-    - Sketch -> Sketch
-    - Adobe XD -> Adobe XD
-    - InVision -> InVision
-    - Zeplin -> Zeplin
-    - Jira -> Jira
-    - Trello -> Trello
-    - Asana -> Asana
-    - Monday.com -> Monday.com
-    - Notion -> Notion
-    - Evernote -> Evernote
-    - OneNote -> OneNote
-    - Slack -> Slack
-    - Discord -> Discord
-    - Zoom -> Zoom
-    - Teams -> Teams
-    - Skype -> Skype
-    - WebEx -> WebEx
-    - GoToMeeting -> GoToMeeting
-    - Google Meet -> Google Meet
-    - BlueJeans -> BlueJeans
-    - Signal -> Signal
-    - Telegram -> Telegram
-    - WhatsApp -> WhatsApp
-    - WeChat -> WeChat
-    - Line -> Line
-    - KakaoTalk -> KakaoTalk
-    - Viber -> Viber
-    - Messenger -> Messenger
-    - Snapchat -> Snapchat
-    - TikTok -> TikTok
-    - Douyin -> 抖音
-    - Kuaishou -> 快手
-    - Bilibili -> Bilibili
-    - YouTube -> YouTube
-    - Twitch -> Twitch
-    - Netflix -> Netflix
-    - Disney+ -> Disney+
-    - Hulu -> Hulu
-    - HBO Max -> HBO Max
-    - Amazon Prime Video -> Amazon Prime Video
-    - Apple TV+ -> Apple TV+
-    - Spotify -> Spotify
-    - Apple Music -> Apple Music
-    - Amazon Music -> Amazon Music
-    - YouTube Music -> YouTube Music
-    - Tidal -> Tidal
-    - Deezer -> Deezer
-    - SoundCloud -> SoundCloud
-    - Bandcamp -> Bandcamp
-    - Audible -> Audible
-    - Kindle -> Kindle
-    - Kobo -> Kobo
-    - Nook -> Nook
-    - Google Play Books -> Google Play Books
-    - Apple Books -> Apple Books
-    - Steam -> Steam
-    - Epic Games Store -> Epic Games Store
-    - GOG -> GOG
-    - Origin -> Origin
-    - Uplay -> Uplay
-    - Battle.net -> Battle.net
-    - PlayStation -> PlayStation
-    - Xbox -> Xbox
-    - Nintendo -> Nintendo
-    - Switch -> Switch
-    - PS5 -> PS5
-    - Xbox Series X -> Xbox Series X
-    - PC -> PC
-    - Mac -> Mac
-    - Linux -> Linux
-    - iOS -> iOS
-    - Android -> Android
-    - VR -> VR
-    - AR -> AR
-    - MR -> MR
-    - AI -> AI
-    - ML -> ML
-    - DL -> DL
-    - NLP -> NLP
-    - CV -> CV
-    - RL -> RL
-    - GAN -> GAN
-    - GPT -> GPT
-    - BERT -> BERT
-    - Transformer -> Transformer
-    - CNN -> CNN
-    - RNN -> RNN
-    - LSTM -> LSTM
-    - SVM -> SVM
-    - KNN -> KNN
-    - K-Means -> K-Means
-    - PCA -> PCA
-    - SVD -> SVD
-    - LDA -> LDA
-    - Q-Learning -> Q-Learning
-    - Deep Q-Network -> Deep Q-Network
-    - Policy Gradient -> Policy Gradient
-    - Actor-Critic -> Actor-Critic
-    - Monte Carlo -> Monte Carlo
-    - AlphaGo -> AlphaGo
-    - AlphaZero -> AlphaZero
-    - OpenAI -> OpenAI
-    - DeepMind -> DeepMind
-    - Google Brain -> Google Brain
-    - Facebook AI Research -> Facebook AI Research
-    - Microsoft Research -> Microsoft Research
-    - IBM Research -> IBM Research
-    - Baidu Research -> Baidu Research
-    - Tencent AI Lab -> Tencent AI Lab
-    - Alibaba DAMO Academy -> Alibaba DAMO Academy
-    - Huawei Noah's Ark Lab -> Huawei Noah's Ark Lab
-    - ByteDance AI Lab -> ByteDance AI Lab
-    - SenseTime -> SenseTime
-    - Megvii -> Megvii
-    - CloudWalk -> CloudWalk
-    - Yitu -> Yitu
-    - iFlytek -> iFlytek
-    - Horizon Robotics -> Horizon Robotics
-    - Cambricon -> Cambricon
-    - DJI -> DJI
-    - Ubtech -> Ubtech
-    - Segway-Ninebot -> Segway-Ninebot
-    - Xiaomi -> Xiaomi
-    - Oppo -> Oppo
-    - Vivo -> Vivo
-    - OnePlus -> OnePlus
-    - Realme -> Realme
-    - Honor -> Honor
-    - Lenovo -> Lenovo
-    - ASUS -> ASUS
-    - Acer -> Acer
-    - MSI -> MSI
-    - Gigabyte -> Gigabyte
-    - HTC -> HTC
-    - Sony -> Sony
-    - Panasonic -> Panasonic
-    - Sharp -> Sharp
-    - Toshiba -> Toshiba
-    - Hitachi -> Hitachi
-    - Fujitsu -> Fujitsu
-    - NEC -> NEC
-    - Mitsubishi -> Mitsubishi
-    - Canon -> Canon
-    - Nikon -> Nikon
-    - Olympus -> Olympus
-    - Fujifilm -> Fujifilm
-    - Ricoh -> Ricoh
-    - Pentax -> Pentax
-    - Leica -> Leica
-    - Hasselblad -> Hasselblad
-    - Zeiss -> Zeiss
-    - Sigma -> Sigma
-    - Tamron -> Tamron
-    - Tokina -> Tokina
-    - Samyang -> Samyang
-    - GoPro -> GoPro
-    - Insta360 -> Insta360
-    - DJI Osmo -> DJI Osmo
-    - Garmin -> Garmin
-    - Fitbit -> Fitbit
-    - Suunto -> Suunto
-    - Polar -> Polar
-    - Coros -> Coros
-    - Amazfit -> Amazfit
-    - Withings -> Withings
-    - Oura -> Oura
-    - Whoop -> Whoop
-    - Peloton -> Peloton
-    - Zwift -> Zwift
-    - Strava -> Strava
-    - Runkeeper -> Runkeeper
-    - Nike Run Club -> Nike Run Club
-    - Adidas Running -> Adidas Running
-    - MyFitnessPal -> MyFitnessPal
-    - Lose It! -> Lose It!
-    - Noom -> Noom
-    - Weight Watchers -> Weight Watchers
-    - Headspace -> Headspace
-    - Calm -> Calm
-    - Insight Timer -> Insight Timer
-    - Waking Up -> Waking Up
-    - Ten Percent Happier -> Ten Percent Happier
-    - BetterHelp -> BetterHelp
-    - Talkspace -> Talkspace
-    - 7 Cups -> 7 Cups
-    - Crisis Text Line -> Crisis Text Line
-    - Suicide Prevention Lifeline -> Suicide Prevention Lifeline
-    - The Trevor Project -> The Trevor Project
-    - RAINN -> RAINN
-    - NAMI -> NAMI
-    - MHA -> MHA
-    - ADAA -> ADAA
-    - DBSA -> DBSA
-    - IOCDF -> IOCDF
-    - PTSD Alliance -> PTSD Alliance
-    - Schizophrenia & Psychosis Action Alliance -> Schizophrenia & Psychosis Action Alliance
-    - Autism Speaks -> Autism Speaks
-    - The Arc -> The Arc
-    - Easterseals -> Easterseals
-    - United Way -> United Way
-    - Red Cross -> Red Cross
-    - Salvation Army -> Salvation Army
-    - Goodwill -> Goodwill
-    - Habitat for Humanity -> Habitat for Humanity
-    - Doctors Without Borders -> Doctors Without Borders
-    - UNICEF -> UNICEF
-    - UNESCO -> UNESCO
-    - UNHCR -> UNHCR
-    - WFP -> WFP
-    - FAO -> FAO
-    - ILO -> ILO
-    - WHO -> WHO
-    - WTO -> WTO
-    - IMF -> IMF
-    - World Bank -> World Bank
-    - OECD -> OECD
-    - G7 -> G7
-    - G20 -> G20
-    - BRICS -> BRICS
-    - ASEAN -> ASEAN
-    - APEC -> APEC
-    - NAFTA -> NAFTA
-    - EU -> EU
-    - NATO -> NATO
-    - UN -> UN
-
-    [TAG MAPPING]
-    Translate tags carefully using these official mappings:
-    - 摸鱼艺术 -> Art of Slacking (en) / 摸魚藝術 (zht)
-    - 时间管理 -> Time Management (en) / 時間管理 (zht)
-    - 亚洲 -> Asia (en) / 亞洲 (zht)
-    - 欧洲 -> Europe (en) / 歐洲 (zht)
-    - 北美 -> North America (en) / 北美 (zht)
-    - 澳洲 -> Australia (en) / 澳洲 (zht)
-    - 什么是FIRE -> What is FIRE (en) / 什麼是FIRE (zht)
-    - 生活成本 -> Cost of Living (en) / 生活成本 (zht)
-    - 理财规划 -> Financial Planning (en) / 理財規劃 (zht)
-    - 医疗保险 -> Health Insurance (en) / 醫療保險 (zht)
-    - 中产焦虑 -> Middle Class Anxiety (en) / 中產焦慮 (zht)
-    - 风险管理 -> Risk Management (en) / 風險管理 (zht)
-
-    [OUTPUT FORMAT]
-    JSON object with:
+  PF_TRANSLATE_CONTENT_ZHT: `
+    You are a Professional Translator (Simplified to Traditional Chinese - Taiwan/HK).
+    
+    [PRIMARY TASK]
+    **TRANSLATE ALL SIMPLIFIED CHINESE TO TRADITIONAL CHINESE.**
+    Use authentic Taiwanese/Hong Kong vocabulary.
+    
+    [FORMATTING RULES - TRANSLATE TEXT, PRESERVE SYNTAX]
+    
+    1. **Headings**: Translate the text, keep the \`##\` or \`###\` syntax.
+       Example: \`## 投资心理误区\` -> \`## 投資心理誤區\`
+    
+    2. **Images**: Translate the ALT text to Traditional Chinese, keep the URL unchanged.
+       Example: \`![封面图](https://example.com/img.jpg)\` -> \`![封面圖](https://example.com/img.jpg)\`
+    
+    3. **Tables**: Translate all cell content, keep the table structure \`|...|...\`.
+       Example: \`| 国家 | 成本 |\` -> \`| 國家 | 成本 |\`
+    
+    4. **Lists**: Translate the text, keep the list markers \`-\` or \`1.\`.
+       Example: \`- 摸鱼艺术\` -> \`- 摸魚藝術\`
+    
+    5. **Bold/Italic**: Translate the text, keep the \`**bold**\` or \`*italic*\` syntax.
+       Example: \`**重要提示**\` -> \`**重要提示**\` (use TW vocab if applicable)
+    
+    6. **Links**: Translate the link text, keep the URL unchanged.
+       Example: \`[阅读更多](url)\` -> \`[閱讀更多](url)\`
+    
+    [KEY VOCABULARY MAPPING]
+    - 软件->軟體, 网络->網路, 质量->品質, 信息->資訊, 视频->影片
+    
+    [OUTPUT JSON]
     {
       "title": "Traditional Chinese Title",
-      "content": "Full Markdown content...",
-      "meta_title": "SEO Title",
-      "description": "SEO Desc",
-      "keywords": "tag1, tag2",
-      "tags": ["Translated Tag 1", "Translated Tag 2"]
+      "content": "Fully translated Traditional Chinese content in Markdown format"
+    }
+  `,
+
+  // NEW: Focused Meta/SEO Generation
+  PF_GENERATE_META: `
+    You are an SEO Expert.
+    
+    [OBJECTIVE]
+    Generate SEO metadata for the provided article in the TARGET LANGUAGE: {{TARGET_LANG}}
+    
+    [INPUTS]
+    Title: {{TITLE}}
+    Content Snippet: {{CONTENT_PREVIEW}}
+    Original Tags: {{ORIGINAL_TAGS}} (Translate these!)
+    
+    [REQUIREMENTS]
+    1. **meta_title**: SEO optimized, under 60 chars.
+    2. **description**: Engaging summary, under 160 chars.
+    3. **keywords**: 3-5 comma separated keywords.
+    4. **tags**: Translate original tags to {{TARGET_LANG}}.
+    5. **translated_tags**: Map original slug to new tag name.
+
+    [OUTPUT JSON]
+    {
+      "meta_title": "...",
+      "description": "...",
+      "keywords": "...",
+      "tags": ["Tag1", "Tag2"],
+      "translated_tags": { "slug": "TargetTagName" }
     }
   `
 };
-
