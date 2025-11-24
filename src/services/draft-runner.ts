@@ -1,9 +1,10 @@
-import { notion, DB_IDS, getPageContent, PageContent } from '@/lib/notion/client';
+import { notion, DB_IDS, getPageContent, PageContent, appendBlocksToPage } from '@/lib/notion/client';
 import { openai, MODELS, ChatMessage } from '@/lib/openai/client';
 import { PROMPTS } from '@/lib/openai/prompts';
 import { nanoid } from 'nanoid';
 import { BlockObjectRequest } from '@notionhq/client/build/src/api-endpoints';
 import { generateAndUploadCover } from '@/services/image-runner';
+import { markdownToBlocks } from '@/lib/notion/markdown';
 
 const BLOG_TAGS = {
   Playfish: [
@@ -152,8 +153,7 @@ export async function runDraftRunner(options?: { limit?: number, skipImage?: boo
       // 4. Create Entry in Draft DB
       console.log('Writing to Draft DB...');
       
-      // Combine all content into a single article (like Notion Article)
-      // Format: Angle + Outline + Draft + ThinkLog (all in one continuous content)
+      // Combine all content
       const fullContent = [
         '# 角度分析',
         draftData.angle || 'N/A',
@@ -170,19 +170,10 @@ export async function runDraftRunner(options?: { limit?: number, skipImage?: boo
         draftData.thinkLog || 'N/A',
       ].join('\n');
       
-      // Split content into blocks (Notion has 2000 char limit per block)
-      // Explicitly type as any[] to avoid TS inference issues with Notion API types
-      const contentBlocks: any[] = [];
-      const MAX_CHUNK_LENGTH = 1800;
-      for (let i = 0; i < fullContent.length; i += MAX_CHUNK_LENGTH) {
-        contentBlocks.push({
-          object: 'block',
-          type: 'paragraph',
-          paragraph: {
-            rich_text: [{ text: { content: fullContent.substring(i, i + MAX_CHUNK_LENGTH) } }],
-          },
-        });
-      }
+      // Parse Markdown to Blocks
+      const contentBlocks = markdownToBlocks(fullContent);
+      const initialDraftBlocks = contentBlocks.slice(0, 100);
+      const remainingDraftBlocks = contentBlocks.slice(100);
       
       const draftDbId = process.env.NOTION_BLOG_AUTO_DRAFT_DB_ID;
       if (!draftDbId) throw new Error('NOTION_BLOG_AUTO_DRAFT_DB_ID missing');
@@ -203,8 +194,12 @@ export async function runDraftRunner(options?: { limit?: number, skipImage?: boo
             rich_text: [{ text: { content: draftId } }],
           },
         },
-        children: contentBlocks,
+        children: initialDraftBlocks,
       });
+
+      if (remainingDraftBlocks.length > 0) {
+         await appendBlocksToPage(draftPage.id, remainingDraftBlocks);
+      }
 
       // 5. Determine Target Blog DB ID
       let targetDbId = process.env.NOTION_PLAYFISH_DB_ID; // Default
@@ -272,18 +267,9 @@ export async function runDraftRunner(options?: { limit?: number, skipImage?: boo
       // 7. Create Entry in Blog DB
       console.log(`Writing to Blog DB (${targetBlog})...`);
       
-      // Need to split draft content into blocks (Notion has 2000 char limit per block)
-      const blogContentBlocks: any[] = [];
-      const draftText = draftData.draft || '';
-      for (let i = 0; i < draftText.length; i += MAX_CHUNK_LENGTH) {
-        blogContentBlocks.push({
-          object: 'block',
-          type: 'paragraph',
-          paragraph: {
-            rich_text: [{ text: { content: draftText.substring(i, i + MAX_CHUNK_LENGTH) } }],
-          },
-        });
-      }
+      const blogContentBlocks = markdownToBlocks(draftData.draft || '');
+      const initialBlogBlocks = blogContentBlocks.slice(0, 100);
+      const remainingBlogBlocks = blogContentBlocks.slice(100);
 
       const blogPage = await notion.pages.create({
         parent: { database_id: targetDbId },
@@ -327,8 +313,12 @@ export async function runDraftRunner(options?: { limit?: number, skipImage?: boo
             select: { name: sectionValue },
           },
         },
-        children: blogContentBlocks as BlockObjectRequest[],
+        children: initialBlogBlocks,
       });
+
+      if (remainingBlogBlocks.length > 0) {
+         await appendBlocksToPage(blogPage.id, remainingBlogBlocks);
+      }
 
       // 8. Update Source DB (Mark as Used) FIRST to prevent duplicate processing if image gen timeouts
       console.log('Updating Source DB (Used=true)...');

@@ -22,16 +22,12 @@ export const notion = new Proxy({} as Client, {
 });
 
 // Database IDs helper
-// Notion Database Names:
-// - Blog-Playfish (摸鱼主题)
-// - Blog-FIRE (FIRE 主题)
-// - Blog-Immigrant (移民主题)
 export const DB_IDS = {
   SOURCE: process.env.NOTION_BLOG_SOURCE_DB_ID!,
   DRAFT: process.env.NOTION_BLOG_AUTO_DRAFT_DB_ID!,
-  BLOG_PLAYFISH: process.env.NOTION_PLAYFISH_DB_ID!, // Blog-Playfish
-  BLOG_FIRE: process.env.NOTION_FIRE_DB_ID!, // Blog-FIRE
-  BLOG_IMMIGRATION: process.env.NOTION_IMMIGRATION_DB_ID!, // Blog-Immigrant
+  BLOG_PLAYFISH: process.env.NOTION_PLAYFISH_DB_ID!,
+  BLOG_FIRE: process.env.NOTION_FIRE_DB_ID!,
+  BLOG_IMMIGRATION: process.env.NOTION_IMMIGRATION_DB_ID!,
 };
 
 // Types for Notion properties (simplified)
@@ -79,4 +75,18 @@ export async function getPageContent(pageId: string): Promise<PageContent> {
   }
 
   return { text: textContent.trim(), imageUrls };
+}
+
+/**
+ * Helper to append blocks to a page in batches of 100 (Notion Limit)
+ */
+export async function appendBlocksToPage(pageId: string, blocks: any[]) {
+  const chunkSize = 100;
+  for (let i = 0; i < blocks.length; i += chunkSize) {
+    const chunk = blocks.slice(i, i + chunkSize);
+    await notion.blocks.children.append({
+      block_id: pageId,
+      children: chunk,
+    });
+  }
 }

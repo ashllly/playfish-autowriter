@@ -1,8 +1,9 @@
-import { notion, DB_IDS, getPageContent, PageContent } from '@/lib/notion/client';
+import { notion, DB_IDS, getPageContent, PageContent, appendBlocksToPage } from '@/lib/notion/client';
 import { openai, MODELS } from '@/lib/openai/client';
 import { PROMPTS } from '@/lib/openai/prompts';
 import { BlockObjectRequest } from '@notionhq/client/build/src/api-endpoints';
 import { getTagName } from '@/lib/constants/tags';
+import { markdownToBlocks } from '@/lib/notion/markdown';
 
 // Types
 export type TranslationTask = {
@@ -197,21 +198,11 @@ export async function translateArticle(
     // 5. Create New Page in Notion
     const targetDbId = getDbIdByTheme(blogTheme);
     
-    // Prepare Content Blocks
-    const contentBlocks: any[] = [];
-    const MAX_CHUNK_LENGTH = 1800;
-    const translatedText = translated.content || '';
+    // Parse Markdown to Blocks
+    const contentBlocks = markdownToBlocks(translated.content || '');
+    const initialBlocks = contentBlocks.slice(0, 100);
+    const remainingBlocks = contentBlocks.slice(100);
     
-    for (let i = 0; i < translatedText.length; i += MAX_CHUNK_LENGTH) {
-      contentBlocks.push({
-        object: 'block',
-        type: 'paragraph',
-        paragraph: {
-          rich_text: [{ text: { content: translatedText.substring(i, i + MAX_CHUNK_LENGTH) } }],
-        },
-      });
-    }
-
     const newPageProperties: any = {
       Title: {
         title: [{ text: { content: translated.title || title } }],
@@ -266,8 +257,12 @@ export async function translateArticle(
     const newPage = await notion.pages.create({
       parent: { database_id: targetDbId },
       properties: newPageProperties,
-      children: contentBlocks as BlockObjectRequest[],
+      children: initialBlocks,
     });
+
+    if (remainingBlocks.length > 0) {
+       await appendBlocksToPage(newPage.id, remainingBlocks);
+    }
 
     return { success: true, url: newPage.url, lang: targetLang };
 
