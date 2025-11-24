@@ -229,25 +229,29 @@ GPT 判断 TargetBlog (Immigrant/Playfish/FIRE) - 对应 Notion DB: Blog-Immigra
 
 ### 🏷️ 预定义标签系统（Tag System）
 
-PF-SEO 将优先从以下列表中选择标签。如果都不合适，GPT 可以在 Draft 的思考日志中建议新标签，但不会直接写入 Blog DB。
+所有 Tag 及其多语言翻译均在 `src/lib/constants/tags.ts` 中严格定义。
 
 **1. Blog-Playfish (摸鱼主题)**
-- 摸鱼艺术 (art-of-fish)
-- 时间管理 (time-management)
+- 摸鱼艺术 (art-of-fish) -> EN: Art of Slacking / ZHT: 摸魚藝術
+- 时间管理 (time-management) -> EN: Time Management / ZHT: 時間管理
 
 **2. Blog-Immigrant (移民主题)**
-- 亚洲 (asia)
-- 欧洲 (eu)
-- 北美 (na)
-- 澳洲 (au)
+- 亚洲 (asia) -> EN: Asia / ZHT: 亞洲
+- 欧洲 (eu) -> EN: Europe / ZHT: 歐洲
+- 北美 (na) -> EN: North America / ZHT: 北美
+- 澳洲 (au) -> EN: Australia / ZHT: 澳洲
 
 **3. Blog-FIRE (FIRE主题)**
-- 什么是FIRE (what-is-fire)
-- 生活成本 (living-cost)
-- 理财规划 (financial-planning)
-- 医疗保险 (health-insurance)
-- 中产焦虑 (middle-class-anxiety)
-- 风险管理 (risk-management)
+- 什么是FIRE (what-is-fire) -> EN: What is FIRE / ZHT: 什麼是FIRE
+- 生活成本 (living-cost) -> EN: Cost of Living / ZHT: 生活成本
+- 理财规划 (financial-planning) -> EN: Financial Planning / ZHT: 理財規劃
+- 医疗保险 (health-insurance) -> EN: Health Insurance / ZHT: 醫療保險
+- 中产焦虑 (middle-class-anxiety) -> EN: Middle Class Anxiety / ZHT: 中產焦慮
+- 风险管理 (risk-management) -> EN: Risk Management / ZHT: 風險管理
+
+**翻译逻辑 (Translation Runner)**：
+- **优先查字典**：如果源文章的 `tag-slug` 存在于上述列表，直接使用预定义的翻译（忽略 GPT 建议）。
+- **GPT 兜底**：如果 `tag-slug` 不在列表（新标签），则将对应的中文标签名传给 GPT 进行翻译。
 
 ---
 

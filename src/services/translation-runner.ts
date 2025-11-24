@@ -2,6 +2,7 @@ import { notion, DB_IDS, getPageContent, PageContent } from '@/lib/notion/client
 import { openai, MODELS } from '@/lib/openai/client';
 import { PROMPTS } from '@/lib/openai/prompts';
 import { BlockObjectRequest } from '@notionhq/client/build/src/api-endpoints';
+import { getTagName } from '@/lib/constants/tags';
 
 // Types
 export type TranslationTask = {
@@ -130,17 +131,42 @@ export async function translateArticle(
     const title = props.Title?.title[0]?.plain_text || '';
     const slug = props.Slug?.rich_text[0]?.plain_text || '';
     const coverUrl = props.Cover?.url || null; // Inherit Cover URL (not Page Cover)
-    const tagSlug = props['tag-slug']?.multi_select || []; // Inherit Tag Slugs
+    const tagSlug = (props['tag-slug']?.multi_select || []).map((t: any) => ({ name: t.name })); // Inherit Tag Slugs
     const section = props.Section?.select?.name || 'playfish';
     const sourceId = props.SourceID?.rich_text[0]?.plain_text || '';
     const draftId = props.DraftID?.rich_text[0]?.plain_text || '';
+    const publicationDate = props.PublicationDate?.date?.start || null; // Inherit PublicationDate
     
-    // 2. Call OpenAI for Translation
-    const prompt = targetLang === 'en' ? PROMPTS.PF_TRANSLATE_EN : PROMPTS.PF_TRANSLATE_ZHT;
+    // --- NEW TAG LOGIC (Slug-Centric) ---
+    // 1. Get Source Tag Slugs (The SSOT)
+    const sourceTagSlugs: string[] = (props['tag-slug']?.multi_select || []).map((t: any) => t.name);
+    // We do NOT look at sourceTagNames (props.Tag) anymore.
+
+    // 2. Separate Known (Dict) vs Pending (New Slugs)
+    const knownTagsMap: Record<string, string> = {}; // slug -> translated name
+    const pendingSlugsToTranslate: string[] = [];
+
+    sourceTagSlugs.forEach((slug) => {
+       const dictName = getTagName(blogTheme, slug, targetLang);
+       if (dictName) {
+         knownTagsMap[slug] = dictName;
+       } else {
+         pendingSlugsToTranslate.push(slug);
+       }
+    });
+
+    // 3. Call OpenAI for Translation
+    let prompt = targetLang === 'en' ? PROMPTS.PF_TRANSLATE_EN : PROMPTS.PF_TRANSLATE_ZHT;
+
+    // Inject instruction for Pending Slugs
+    if (pendingSlugsToTranslate.length > 0) {
+      prompt += `\n\n[MANDATORY TAG GENERATION]\nWe have some new tags defined by slugs. Please generate a natural ${targetLang === 'en' ? 'English' : 'Traditional Chinese'} tag name for each slug.\nInput Slugs: ${JSON.stringify(pendingSlugsToTranslate)}\n\nIMPORTANT: Return a "translated_tags" field in your JSON response mapping the SLUG to the GENERATED TAG NAME. Example: { "translated_tags": { "ai-tools": "AI Tools" } }`;
+    }
+
     const userContent = `Title: ${title}\n\nContent:\n${sourceContent.text}`;
 
     const completion = await openai.chat.completions.create({
-      model: MODELS.TRANSLATE, // gpt-4o-mini is fine
+      model: MODELS.TRANSLATE,
       messages: [
         { role: 'system', content: prompt },
         { role: 'user', content: userContent },
@@ -152,7 +178,23 @@ export async function translateArticle(
     if (!resultJson) throw new Error('Empty translation response');
     const translated = JSON.parse(resultJson);
 
-    // 3. Create New Page in Notion
+    // 4. Construct Final Tags (Strictly following Slug order)
+    const gptGeneratedTagsMap = translated.translated_tags || {};
+    
+    const finalTags: string[] = sourceTagSlugs.map(slug => {
+      // Priority 1: Dictionary
+      if (knownTagsMap[slug]) return knownTagsMap[slug];
+      
+      // Priority 2: GPT Generated
+      if (gptGeneratedTagsMap[slug]) return gptGeneratedTagsMap[slug];
+      
+      // Fallback: Use Slug itself as Tag Name (better than nothing or mismatch)
+      return slug;
+    });
+
+    // --- END NEW TAG LOGIC ---
+
+    // 5. Create New Page in Notion
     const targetDbId = getDbIdByTheme(blogTheme);
     
     // Prepare Content Blocks
@@ -170,49 +212,60 @@ export async function translateArticle(
       });
     }
 
+    const newPageProperties: any = {
+      Title: {
+        title: [{ text: { content: translated.title || title } }],
+      },
+      Lang: {
+        select: { name: targetLang },
+      },
+      SourceID: {
+        rich_text: [{ text: { content: sourceId } }],
+      },
+      DraftID: {
+        rich_text: [{ text: { content: draftId } }],
+      },
+      Slug: {
+        rich_text: [{ text: { content: slug } }], // Inherit
+      },
+      'meta-title': {
+        rich_text: [{ text: { content: translated.meta_title || '' } }],
+      },
+      Description: {
+        rich_text: [{ text: { content: translated.description || '' } }],
+      },
+      Keywords: {
+        rich_text: [{ text: { content: translated.keywords || '' } }],
+      },
+      Tag: {
+        multi_select: finalTags.map((t: string) => ({ name: t })), // Use Final Merged Tags
+      },
+      'tag-slug': {
+        multi_select: tagSlug, // Inherit
+      },
+      Section: {
+        select: { name: section }, // Inherit
+      },
+      Published: {
+        checkbox: true, // Auto Publish
+      },
+    };
+
+    if (coverUrl) {
+      newPageProperties.Cover = {
+        url: coverUrl,
+      };
+    }
+
+    if (publicationDate) {
+      newPageProperties.PublicationDate = {
+        date: { start: publicationDate },
+      };
+    }
+
     const newPage = await notion.pages.create({
       parent: { database_id: targetDbId },
-      properties: {
-        Title: {
-          title: [{ text: { content: translated.title || title } }],
-        },
-        Lang: {
-          select: { name: targetLang },
-        },
-        SourceID: {
-          rich_text: [{ text: { content: sourceId } }],
-        },
-        DraftID: {
-          rich_text: [{ text: { content: draftId } }],
-        },
-        Slug: {
-          rich_text: [{ text: { content: slug } }], // Inherit
-        },
-        'meta-title': {
-          rich_text: [{ text: { content: translated.meta_title || '' } }],
-        },
-        Description: {
-          rich_text: [{ text: { content: translated.description || '' } }],
-        },
-        Keywords: {
-          rich_text: [{ text: { content: translated.keywords || '' } }],
-        },
-        Tag: {
-          multi_select: (translated.tags || []).map((t: string) => ({ name: t })), // Translated Tags
-        },
-        'tag-slug': {
-          multi_select: tagSlug, // Inherit
-        },
-        Section: {
-          select: { name: section }, // Inherit
-        },
-        Cover: coverUrl ? {
-          url: coverUrl // Inherit
-        } : undefined,
-        Published: {
-          checkbox: false, // Default to Unpublished for review
-        },
-      },
+      properties: newPageProperties,
       children: contentBlocks as BlockObjectRequest[],
     });
 
@@ -263,4 +316,3 @@ export async function runAutoTranslation() {
     return { processed: 0, error: error.message };
   }
 }
-

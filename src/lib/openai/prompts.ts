@@ -270,6 +270,21 @@ AI 必须从 24 种开头技巧中：
       - 高考 -> SATs / College Exams
       - 一线城市 -> Major Cities / Metropolises
 
+    [TAG MAPPING]
+    Translate tags carefully using these official mappings:
+    - 摸鱼艺术 -> Art of Slacking (en)
+    - 时间管理 -> Time Management (en)
+    - 亚洲 -> Asia (en)
+    - 欧洲 -> Europe (en)
+    - 北美 -> North America (en)
+    - 澳洲 -> Australia (en)
+    - 什么是FIRE -> What is FIRE (en)
+    - 生活成本 -> Cost of Living (en)
+    - 理财规划 -> Financial Planning (en)
+    - 医疗保险 -> Health Insurance (en)
+    - 中产焦虑 -> Middle Class Anxiety (en)
+    - 风险管理 -> Risk Management (en)
+
     [OUTPUT FORMAT]
     JSON object with:
     {
@@ -871,6 +886,21 @@ AI 必须从 24 种开头技巧中：
     - EU -> EU
     - NATO -> NATO
     - UN -> UN
+
+    [TAG MAPPING]
+    Translate tags carefully using these official mappings:
+    - 摸鱼艺术 -> Art of Slacking (en) / 摸魚藝術 (zht)
+    - 时间管理 -> Time Management (en) / 時間管理 (zht)
+    - 亚洲 -> Asia (en) / 亞洲 (zht)
+    - 欧洲 -> Europe (en) / 歐洲 (zht)
+    - 北美 -> North America (en) / 北美 (zht)
+    - 澳洲 -> Australia (en) / 澳洲 (zht)
+    - 什么是FIRE -> What is FIRE (en) / 什麼是FIRE (zht)
+    - 生活成本 -> Cost of Living (en) / 生活成本 (zht)
+    - 理财规划 -> Financial Planning (en) / 理財規劃 (zht)
+    - 医疗保险 -> Health Insurance (en) / 醫療保險 (zht)
+    - 中产焦虑 -> Middle Class Anxiety (en) / 中產焦慮 (zht)
+    - 风险管理 -> Risk Management (en) / 風險管理 (zht)
 
     [OUTPUT FORMAT]
     JSON object with:
