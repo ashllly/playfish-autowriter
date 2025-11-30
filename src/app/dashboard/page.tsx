@@ -32,6 +32,11 @@ export default function DashboardPage() {
   const [translationResults, setTranslationResults] = useState<any[]>([]);
   const [translationLogs, setTranslationLogs] = useState<string[]>([]);
 
+  // SEO Fixer State
+  const [loadingSeoFix, setLoadingSeoFix] = useState(false);
+  const [seoFixResult, setSeoFixResult] = useState<any>(null);
+  const [seoFixTargetDb, setSeoFixTargetDb] = useState<string>('');
+
   const runSourceRunner = async () => {
     setLoadingSource(true);
     setError(null);
@@ -323,6 +328,36 @@ export default function DashboardPage() {
     setProcessingTranslations(false);
     setTranslationLogs(prev => [`🎉 All Tasks Completed!`, ...prev]);
     runTranslationScan(); // Refresh list
+  };
+
+  // SEO Fixer Functions
+  const runSeoFixer = async () => {
+    setLoadingSeoFix(true);
+    setError(null);
+    setSeoFixResult(null);
+
+    try {
+      const url = seoFixTargetDb 
+        ? `/api/manual/fix-seo?target=${seoFixTargetDb}`
+        : '/api/manual/fix-seo';
+      
+      const res = await fetch(url, { method: 'GET' });
+      const data = await res.json();
+      
+      if (!res.ok || !data.success) {
+        setError(data.error || data.message || `HTTP Error: ${res.status}`);
+        if (data.data) {
+          setSeoFixResult(data);
+        }
+      } else {
+        setSeoFixResult(data);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Unknown error occurred');
+    } finally {
+      setLoadingSeoFix(false);
+    }
   };
 
   return (
@@ -701,6 +736,89 @@ export default function DashboardPage() {
                     <div className="text-center py-4 text-sm text-gray-500">
                       🎉 All articles translated!
                     </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* SEO Fixer Runner Card */}
+          <div className="bg-white overflow-hidden shadow rounded-lg border border-gray-100">
+            <div className="px-4 py-5 sm:p-6">
+              <div className="flex items-center justify-between mb-4">
+                 <h3 className="text-lg leading-6 font-medium text-gray-900">
+                  SEO Fixer Runner
+                 </h3>
+                 <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
+                   Maintenance
+                 </span>
+              </div>
+              <div className="mt-2 max-w-xl text-sm text-gray-500">
+                <p>Fix missing SEO metadata (Slug, Description, Keywords, Tags, IDs, Cover) for existing articles.</p>
+              </div>
+              
+              <div className="mt-5 flex flex-col gap-3">
+                <select 
+                  value={seoFixTargetDb} 
+                  onChange={(e) => setSeoFixTargetDb(e.target.value)}
+                  disabled={loadingSeoFix}
+                  className="block w-full text-sm border-gray-300 rounded-md"
+                >
+                  <option value="">All Databases</option>
+                  <option value="Playfish">Playfish Only</option>
+                  <option value="FIRE">FIRE Only</option>
+                  <option value="Immigrant">Immigrant Only</option>
+                </select>
+                <button
+                  onClick={runSeoFixer}
+                  disabled={loadingSeoFix}
+                  type="button"
+                  className={`inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white 
+                    ${loadingSeoFix ? 'bg-orange-400 cursor-not-allowed' : 'bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500'}`}
+                >
+                  {loadingSeoFix ? 'Running...' : 'Fix Missing SEO'}
+                </button>
+              </div>
+
+              {/* SEO Fix Result Display */}
+              {seoFixResult && (
+                <div className={`mt-4 rounded-md p-3 border ${seoFixResult.error ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-100'}`}>
+                  <p className={`text-sm font-medium ${seoFixResult.error ? 'text-red-800' : 'text-green-800'}`}>
+                    {seoFixResult.error 
+                      ? `❌ Error: ${seoFixResult.error}` 
+                      : `✅ Scan Complete: Found ${seoFixResult.data?.scannedCount || 0} pages, Processed ${seoFixResult.data?.processed || 0} pages`
+                    }
+                  </p>
+                  
+                  {/* Detailed Logs */}
+                  {seoFixResult.data?.logs && seoFixResult.data.logs.length > 0 && (
+                    <div className="mt-3 mb-3 bg-black bg-opacity-90 rounded p-2 h-32 overflow-y-auto text-[10px] font-mono text-green-400">
+                      {seoFixResult.data.logs.map((log: string, i: number) => (
+                        <div key={i} className="border-b border-gray-800 pb-0.5 mb-0.5">{log}</div>
+                      ))}
+                    </div>
+                  )}
+
+                  {seoFixResult.data?.results && seoFixResult.data.results.length > 0 ? (
+                    <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
+                      {seoFixResult.data.results.map((item: any, idx: number) => (
+                        <div key={idx} className={`p-2 rounded border text-xs ${item.error ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}>
+                          <p className="font-medium">{item.title}</p>
+                          {item.fixes && item.fixes.length > 0 && (
+                            <p className="text-gray-600 mt-1">Fixed: {item.fixes.join(', ')}</p>
+                          )}
+                          {item.error && (
+                            <p className="text-red-600 mt-1">Error: {item.error}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    !seoFixResult.error && (
+                      <div className="mt-2 text-xs text-gray-500 italic">
+                        No pages required fixing. All metadata looks good!
+                      </div>
+                    )
                   )}
                 </div>
               )}

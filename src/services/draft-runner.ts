@@ -3,7 +3,7 @@ import { openai, MODELS, ChatMessage } from '@/lib/openai/client';
 import { PROMPTS } from '@/lib/openai/prompts';
 import { nanoid } from 'nanoid';
 import { BlockObjectRequest } from '@notionhq/client/build/src/api-endpoints';
-import { generateAndUploadCover } from '@/services/image-runner';
+import { generateAndUploadCover, generateCoverAltPlan } from '@/services/image-runner';
 import { markdownToBlocks } from '@/lib/notion/markdown';
 
 const BLOG_TAGS = {
@@ -26,6 +26,19 @@ const BLOG_TAGS = {
     '风险管理 (risk-management)',
   ]
 };
+
+const blogCoverAltCache = new Map<string, boolean>();
+async function hasCoverAltProperty(databaseId?: string) {
+  if (!databaseId) return false;
+  if (blogCoverAltCache.has(databaseId)) {
+    return blogCoverAltCache.get(databaseId)!;
+  }
+  const schema = await notion.databases.retrieve({ database_id: databaseId });
+  // Alt 字段在博客 DB 中统一命名为 "Cover Alt"
+  const hasProp = Boolean((schema as any).properties?.['Cover Alt']);
+  blogCoverAltCache.set(databaseId, hasProp);
+  return hasProp;
+}
 
 type DraftResult = {
   processed: number;
@@ -339,12 +352,22 @@ export async function runDraftRunner(options?: { limit?: number, skipImage?: boo
       let coverUrl: string | undefined;
       if (!skipImage) {
         console.log('Attempting to generate cover image...');
-        const imageResult = await generateAndUploadCover(
-          blogPage.id,
-          articleTitle,
+        const coverPlan = await generateCoverAltPlan({
+          title: articleTitle,
           blogTheme,
-          seoData.Keywords || ''
-        );
+          summary: articleContent.substring(0, 2000),
+          keywords: seoData.Keywords || '',
+        });
+        const imageResult = await generateAndUploadCover({
+          pageId: blogPage.id,
+          title: articleTitle,
+          blogTheme,
+          coverAlt: coverPlan.coverAlt,
+          visualPrompt: coverPlan.imagePrompt,
+          keywords: seoData.Keywords || '',
+          hasCoverAltProperty: await hasCoverAltProperty(targetDbId),
+          shotType: coverPlan.shotType,
+        });
         
         if (imageResult.success) {
           coverUrl = imageResult.url;

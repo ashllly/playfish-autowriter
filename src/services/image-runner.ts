@@ -2,34 +2,161 @@ import { openai, MODELS } from '@/lib/openai/client';
 import { notion } from '@/lib/notion/client';
 import { uploadImage } from '@/lib/storage/client';
 import { nanoid } from 'nanoid';
+import { PROMPTS } from '@/lib/openai/prompts';
 
-// Presets based on User's Style Guide V1
+// Presets based on User's Style Guide V1 (still used as tonal reference)
 const THEME_PRESETS: Record<string, string> = {
-  Immigrant: "European or global city landmarks, airport scenes, passports or luggage, clean and minimal composition, cool tones, sky blue and beige colors.",
-  FIRE: "Clean desk with notebook, calculator, laptop, dollar bills, savings concept, soft natural light, modern and simple composition, cool tones.",
-  Playfish: "Modern workspace, coffee shop vibe, laptop, notebook, or lifestyle scenes, clean composition, neutral tones, professional yet relaxed."
+  Immigrant: 'Global city streets, visa offices, relocation essentials, natural light, cool palette.',
+  FIRE: 'Financial planning desks, spreadsheets, calculators, confident adults, muted tones.',
+  Playfish: 'Modern work/life scenes, candid portraits, cozy cafés, neutral palettes, warm highlights.',
 };
 
-const BASE_STYLE = "Style: Realistic photography, clean, bright, professional, trustworthy. Color style: cool tones and neutral tones (light blue, beige, white, wood). Composition: Simple, plenty of empty space, minimal objects. Vibe: Modern lifestyle.";
+const BASE_STYLE =
+  [
+    // 相机与镜头（强化“真实相机”感）
+    'Shot on Sony A7R IV, 50mm f/1.8 portrait lens, shallow depth of field, natural bokeh.',
+    // 皮肤与质感
+    'Natural skin texture with visible pores and tiny imperfections, subtle facial hair where appropriate, realistic lighting on skin, no beauty filter.',
+    // 环境与光线
+    'Golden hour sunlight or soft natural window light, gentle soft shadows, believable street ambient light where relevant.',
+    // 纹理与噪点
+    'Subtle film grain, very light motion blur if subject is moving, realistic color grading similar to professional photography.',
+    // 明确排除插画风格
+    'Ultra realistic photography, NOT illustration, NOT 3D render, NOT CGI, NOT vector art.',
+    // 避免 AI 过度美化
+    'Avoid prompts like perfect face, flawless skin, hyper-beautiful; faces should look like real people, not AI models.',
+    // 构图规格
+    'Aspect ratio 1792x1024 landscape, enough negative space for layout, clean and modern composition.',
+  ].join(' ');
 
-export async function generateAndUploadCover(
-  pageId: string,
-  title: string,
-  blogTheme: string,
-  keywords: string
-) {
+const COVER_ALT_THEME_LABELS: Record<string, string> = {
+  Playfish: '职场与生活方式',
+  FIRE: '投资与资产配置',
+  Immigrant: '海外生活与移民',
+};
+
+type CoverAltPlan = {
+  coverAlt: string;
+  imagePrompt: string;
+  shotType?: 'close-up' | 'medium' | 'wide';
+};
+
+function buildFallbackCoverAlt(title: string, theme: string, keywords: string) {
+  const themeLabel = COVER_ALT_THEME_LABELS[theme] || theme;
+  const keywordList = (keywords || '')
+    .split(',')
+    .map((k) => k.trim())
+    .filter(Boolean);
+  const keywordPart = keywordList.slice(0, 3).join('、');
+  if (keywordPart) {
+    return `${title}｜${themeLabel}｜${keywordPart}封面图`;
+  }
+  return `${title}｜${themeLabel}主题封面图`;
+}
+
+export async function generateCoverAltPlan(params: {
+  title: string;
+  blogTheme: string;
+  summary: string;
+  keywords?: string;
+}): Promise<CoverAltPlan> {
+  const { title, blogTheme, summary, keywords = '' } = params;
+  const fallbackAlt = buildFallbackCoverAlt(title, blogTheme, keywords);
+  const safeSummary = summary?.trim().slice(0, 1200);
+
+  if (!safeSummary) {
+    return {
+      coverAlt: fallbackAlt,
+      imagePrompt: `${fallbackAlt}. Real people, real location, natural light.`,
+      shotType: 'medium',
+    };
+  }
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: MODELS.SEO,
+      messages: [
+        { role: 'system', content: PROMPTS.PF_COVER_ALT },
+        {
+          role: 'user',
+          content: JSON.stringify(
+            {
+              Title: title,
+              Theme: blogTheme,
+              Summary: safeSummary,
+              Keywords: keywords,
+            },
+            null,
+            2
+          ),
+        },
+      ],
+      response_format: { type: 'json_object' },
+    });
+
+    const payloadStr = completion.choices[0]?.message?.content;
+    if (!payloadStr) {
+      throw new Error('Empty response from PF_COVER_ALT');
+    }
+    const payload = JSON.parse(payloadStr);
+    return {
+      coverAlt: (payload.coverAlt || fallbackAlt).slice(0, 200),
+      imagePrompt:
+        payload.imagePrompt ||
+        `${fallbackAlt} realistic scene, real humans, soft cinematic light`,
+      shotType: payload.shotType || 'medium',
+    };
+  } catch (error) {
+    console.warn('Cover Alt generation failed, using fallback:', error);
+    return {
+      coverAlt: fallbackAlt,
+      imagePrompt: `${fallbackAlt}. Real people or real objects, cinematic light.`,
+      shotType: 'medium',
+    };
+  }
+}
+
+type GenerateCoverOptions = {
+  pageId: string;
+  title: string;
+  blogTheme: string;
+  coverAlt: string;
+  visualPrompt?: string;
+  keywords?: string;
+  hasCoverAltProperty?: boolean;
+  shotType?: 'close-up' | 'medium' | 'wide';
+};
+
+export async function generateAndUploadCover(options: GenerateCoverOptions) {
+  const {
+    pageId,
+    title,
+    blogTheme,
+    coverAlt,
+    visualPrompt,
+    keywords = '',
+    hasCoverAltProperty = true,
+    shotType = 'medium',
+  } = options;
+
   console.log(`🎨 Generating cover for: ${title} (${blogTheme})`);
 
   try {
     // 1. Construct Prompt
     const themePreset = THEME_PRESETS[blogTheme] || THEME_PRESETS['Playfish'];
-    // Use first 2 keywords or title if no keywords
-    const subject = keywords.split(',').slice(0, 2).join(' ') || title;
-    
-    const prompt = `A clean, bright, realistic photograph representing: ${subject}. 
-    Elements: ${themePreset}
+    const realismGuard =
+      'Focus on authentic people or real objects, candid emotion, documentary-style realism. Avoid cliché motifs like generic passport-and-ticket unless explicitly in the alt text. Faces and objects must look like real-world photography, not illustration or CGI.';
+    const subject =
+      visualPrompt ||
+      coverAlt ||
+      `${title} realistic scene with ${keywords.split(',').slice(0, 2).join(' ')}`;
+
+    const prompt = `${subject}.
+    ${realismGuard}
+    ${themePreset}
     ${BASE_STYLE}
-    Image ratio 1792x1024 (landscape), realistic photography, no text, no illustration.`;
+    Shot guidance: ${shotType} shot, landscape 1792x1024, eye-level perspective.
+    `;
 
     console.log(`Prompt: ${prompt}`);
 
@@ -73,13 +200,20 @@ export async function generateAndUploadCover(
     }
     */
 
+    const propertiesUpdate: Record<string, any> = {
+      Cover: { url: publicUrl },
+    };
+
+    // 全局约定：博客 DB 中 Alt 字段命名为 "Cover Alt"
+    if (hasCoverAltProperty && coverAlt) {
+      propertiesUpdate['Cover Alt'] = {
+        rich_text: [{ text: { content: coverAlt.slice(0, 200) } }],
+      };
+    }
+
     const updateResponse = await notion.pages.update({
       page_id: pageId,
-      properties: {
-        Cover: {
-          url: publicUrl
-        }
-      }
+      properties: propertiesUpdate,
     });
     
     console.log(`Notion Update Response: ID=${updateResponse.id}`);
@@ -87,7 +221,7 @@ export async function generateAndUploadCover(
     return { success: true, url: publicUrl };
 
   } catch (error: any) {
-    console.error("Image Generation Failed:", error);
+    console.error('Image Generation Failed:', error);
     
     // Provide more helpful error messages
     let errorMessage = error.message;

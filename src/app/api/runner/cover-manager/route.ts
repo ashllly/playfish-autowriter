@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { notion, DB_IDS } from '@/lib/notion/client';
-import { generateAndUploadCover } from '@/services/image-runner';
+import { notion, DB_IDS, getPageContent } from '@/lib/notion/client';
+import { generateAndUploadCover, generateCoverAltPlan } from '@/services/image-runner';
 
 // Helper to scan a specific DB for missing covers
 async function scanDatabase(dbId: string, themeName: string) {
@@ -80,11 +80,41 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { pageId, title, blogTheme, keywords } = body;
 
-    if (!pageId || !title || !blogTheme) {
+    if (!pageId || !blogTheme) {
       return NextResponse.json({ success: false, error: 'Missing required parameters' }, { status: 400 });
     }
 
-    const result = await generateAndUploadCover(pageId, title, blogTheme, keywords || '');
+    const page = await notion.pages.retrieve({ page_id: pageId });
+    const pageProps = (page as any).properties || {};
+    const resolvedTitle =
+      title || pageProps.Title?.title?.[0]?.plain_text || 'Untitled Article';
+    const resolvedKeywords = keywords || pageProps.Keywords?.rich_text?.[0]?.plain_text || '';
+    // Alt 字段在博客 DB 中统一命名为 "Cover Alt"
+    const hasCoverAltProperty = Boolean(pageProps['Cover Alt']);
+
+    const pageContent = await getPageContent(pageId);
+    const summarySource =
+      pageContent.text ||
+      pageProps.Description?.rich_text?.[0]?.plain_text ||
+      resolvedTitle;
+
+    const coverPlan = await generateCoverAltPlan({
+      title: resolvedTitle,
+      blogTheme,
+      summary: summarySource.substring(0, 2000),
+      keywords: resolvedKeywords,
+    });
+
+    const result = await generateAndUploadCover({
+      pageId,
+      title: resolvedTitle,
+      blogTheme,
+      coverAlt: coverPlan.coverAlt,
+      visualPrompt: coverPlan.imagePrompt,
+      keywords: resolvedKeywords,
+      hasCoverAltProperty,
+      shotType: coverPlan.shotType,
+    });
 
     if (result.success) {
       return NextResponse.json({ success: true, url: result.url });
