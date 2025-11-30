@@ -152,7 +152,7 @@ export function markdownToBlocks(markdown: string): BlockObjectRequest[] {
       const isOrdered = token.ordered;
       for (const item of token.items) {
           let itemRichText: RichTextItemRequest[] = [];
-          item.tokens.forEach(t => {
+          item.tokens.forEach((t: Token) => {
               if (t.type === 'text') {
                   itemRichText.push(...tokensToRichText((t as any).tokens || [{type:'text', text: t.text}]));
               } else if (t.type === 'paragraph') {
