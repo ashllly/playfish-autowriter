@@ -152,11 +152,11 @@ export function markdownToBlocks(markdown: string): BlockObjectRequest[] {
       const isOrdered = token.ordered;
       for (const item of token.items) {
           let itemRichText: RichTextItemRequest[] = [];
-          item.tokens.forEach((t: Token) => {
+          item.tokens.forEach((t: any) => {
               if (t.type === 'text') {
                   itemRichText.push(...tokensToRichText((t as any).tokens || [{type:'text', text: t.text}]));
               } else if (t.type === 'paragraph') {
-                   itemRichText.push(...tokensToRichText(t.tokens));
+                   itemRichText.push(...tokensToRichText(t.tokens || []));
               }
           });
 
@@ -178,7 +178,7 @@ export function markdownToBlocks(markdown: string): BlockObjectRequest[] {
     else if (token.type === 'blockquote') {
        const quoteText: RichTextItemRequest[] = [];
        token.tokens?.forEach(t => {
-           if (t.type === 'paragraph') quoteText.push(...tokensToRichText(t.tokens));
+           if (t.type === 'paragraph') quoteText.push(...tokensToRichText(t.tokens || []));
            quoteText.push({ type: 'text', text: { content: '\n' } });
        });
        if (quoteText.length > 0 && quoteText[quoteText.length-1].text?.content === '\n') {
@@ -212,15 +212,15 @@ export function markdownToBlocks(markdown: string): BlockObjectRequest[] {
         });
     }
     else if (token.type === 'table') {
-        const tableRows: BlockObjectRequest[] = [];
-        const headerCells = token.header.map(cell => tokensToRichText(cell.tokens));
+        const tableRows: any[] = [];
+        const headerCells = token.header.map((cell: any) => tokensToRichText(cell.tokens));
         tableRows.push({
             object: 'block',
             type: 'table_row',
             table_row: { cells: headerCells }
         });
         for (const row of token.rows) {
-            const rowCells = row.map(cell => tokensToRichText(cell.tokens));
+            const rowCells = row.map((cell: any) => tokensToRichText(cell.tokens));
              tableRows.push({
                 object: 'block',
                 type: 'table_row',
