@@ -240,9 +240,9 @@ AI 应：
   "outline": "STEP 4 的 SEO 大纲",
   "draft": "STEP 5 的完整正文（Markdown）",
   "thinkLog": "STEP 1-3 的思考与策略",
-  "targetBlog": "Playfish 或 FIRE 或 Immigrant"
+   "targetBlog": "Playfish 或 FIRE 或 Immigrant"
 }
-`,,
+`,
 
   PF_SEO: `
     PF-SEO 命令集 —— Playfish SEO 生成器（Notion 字段专用版）
