@@ -1,5 +1,24 @@
-import { BlockObjectRequest, RichTextItemRequest } from '@notionhq/client/build/src/api-endpoints';
+import { BlockObjectRequest } from '@notionhq/client/build/src/api-endpoints';
 import { marked } from 'marked';
+
+// NOTE:
+// 新版 @notionhq/client 已不再从内部路径导出 RichTextItemRequest。
+// 为避免依赖不稳定的内部类型，这里使用一个最小别名来约束结构，
+// 仅包含本文件真正使用到的字段。
+type RichTextItemRequest = {
+  type: 'text';
+  text: {
+    content: string;
+    link?: { url: string } | null;
+  };
+  annotations?: {
+    bold?: boolean;
+    italic?: boolean;
+    code?: boolean;
+    [key: string]: any;
+  };
+  [key: string]: any;
+};
 
 // Configure marked to use GFM (tables, etc.)
 marked.use({ gfm: true });
