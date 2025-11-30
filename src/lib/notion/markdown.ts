@@ -1,5 +1,5 @@
 import { BlockObjectRequest } from '@notionhq/client/build/src/api-endpoints';
-import { marked } from 'marked';
+import { marked, Token, Tokens } from 'marked';
 
 // NOTE:
 // 新版 @notionhq/client 已不再从内部路径导出 RichTextItemRequest。
@@ -24,7 +24,7 @@ type RichTextItemRequest = {
 marked.use({ gfm: true });
 
 // --- Helper: Convert Inline Tokens to Notion RichText ---
-function tokensToRichText(tokens: marked.Token[]): RichTextItemRequest[] {
+function tokensToRichText(tokens: Token[]): RichTextItemRequest[] {
   const richText: RichTextItemRequest[] = [];
 
   for (const token of tokens) {
@@ -130,7 +130,7 @@ export function markdownToBlocks(markdown: string): BlockObjectRequest[] {
     else if (token.type === 'paragraph') {
       // Check for standalone image wrapped in paragraph
       if (token.tokens && token.tokens.length === 1 && token.tokens[0].type === 'image') {
-          const imgToken = token.tokens[0] as marked.Tokens.Image;
+          const imgToken = token.tokens[0] as Tokens.Image;
           blocks.push({
             object: 'block',
             type: 'image',
