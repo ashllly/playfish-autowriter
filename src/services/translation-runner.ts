@@ -466,7 +466,7 @@ export async function translateArticle(
        await appendBlocksToPage(newPage.id, remainingBlocks);
     }
 
-    return { success: true, url: newPage.url, lang: targetLang };
+    return { success: true, url: (newPage as any).url, lang: targetLang };
 
   } catch (error: any) {
     console.error('Translation Failed:', error);
