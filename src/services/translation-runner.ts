@@ -4,6 +4,7 @@ import { PROMPTS } from '@/lib/openai/prompts';
 import { BlockObjectRequest } from '@notionhq/client/build/src/api-endpoints';
 import { getTagName } from '@/lib/constants/tags';
 import { fetchBlockTree, collectTextNodes, translateTexts, reconstructBlocks } from '@/lib/notion/block-translator';
+import { localizeInternalLinks, warmUpLinkCache } from '@/services/link-manager';
 
 // Types
 export type TranslationTask = {
@@ -37,12 +38,12 @@ function getDbIdByTheme(theme: string): string {
 }
 
 // 1. Scan Logic
-export async function scanForMissingTranslations(): Promise<TranslationTask[]> {
-  const dbIds = [
-    process.env.NOTION_PLAYFISH_DB_ID!,
-    process.env.NOTION_FIRE_DB_ID!,
-    process.env.NOTION_IMMIGRATION_DB_ID!
-  ];
+export async function scanForMissingTranslations(targetDb?: 'Playfish' | 'FIRE' | 'Immigrant' | 'All'): Promise<TranslationTask[]> {
+  const dbIds: string[] = [];
+  
+  if (!targetDb || targetDb === 'All' || targetDb === 'Playfish') dbIds.push(process.env.NOTION_PLAYFISH_DB_ID!);
+  if (!targetDb || targetDb === 'All' || targetDb === 'FIRE') dbIds.push(process.env.NOTION_FIRE_DB_ID!);
+  if (!targetDb || targetDb === 'All' || targetDb === 'Immigrant') dbIds.push(process.env.NOTION_IMMIGRATION_DB_ID!);
 
   let allTasks: TranslationTask[] = [];
 
@@ -357,8 +358,13 @@ export async function translateArticle(
     console.log('Step D: Reconstructing Blocks...');
     const newContentBlocks = reconstructBlocks(sourceBlocks, translatedTexts);
 
+    // E. Localize Links (NEW Step)
+    console.log('Step E: Localizing Internal Links...');
+    await warmUpLinkCache();
+    const localizedBlocks = await localizeInternalLinks(newContentBlocks, targetLang);
+
     // --- SEO META GENERATION (Keep existing logic but simplify source) ---
-    console.log('Step E: Generating Meta...');
+    console.log('Step F: Generating Meta...');
     
     // We use the first 3000 chars of translated text for Meta generation context
     const contextText = translatedTexts.join('\n').substring(0, 3000);
@@ -395,7 +401,7 @@ export async function translateArticle(
     });
 
     // --- FINAL WRITE ---
-    console.log('Step F: Writing New Page...');
+    console.log('Step G: Writing New Page...');
     const targetDbId = getDbIdByTheme(blogTheme);
     
     const newPageProperties: any = {
@@ -452,8 +458,8 @@ export async function translateArticle(
     // Create Page with Initial Blocks (Slice if too big? Notion create limit is 100)
     // reconstructBlocks returns full array. We need to slice.
     const CHUNK_SIZE = 100;
-    const initialBlocks = newContentBlocks.slice(0, CHUNK_SIZE);
-    const remainingBlocks = newContentBlocks.slice(CHUNK_SIZE);
+    const initialBlocks = localizedBlocks.slice(0, CHUNK_SIZE);
+    const remainingBlocks = localizedBlocks.slice(CHUNK_SIZE);
 
     const newPage = await notion.pages.create({
       parent: { database_id: targetDbId },

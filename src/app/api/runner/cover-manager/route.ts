@@ -53,12 +53,16 @@ export async function GET(request: Request) {
   // For simplicity, we assume this is called from Dashboard which is protected or local.
   // Add Basic Auth check here for production safety.
   
+  const { searchParams } = new URL(request.url);
+  const targetDb = searchParams.get('target');
+
   try {
-    const [playfish, fire, immigrant] = await Promise.all([
-      scanDatabase(process.env.NOTION_PLAYFISH_DB_ID!, 'Playfish'),
-      scanDatabase(process.env.NOTION_FIRE_DB_ID!, 'FIRE'),
-      scanDatabase(process.env.NOTION_IMMIGRATION_DB_ID!, 'Immigrant'),
-    ]);
+    const playfish = (targetDb === 'All' || targetDb === 'Playfish' || !targetDb) 
+      ? await scanDatabase(process.env.NOTION_PLAYFISH_DB_ID!, 'Playfish') : [];
+    const fire = (targetDb === 'All' || targetDb === 'FIRE' || !targetDb) 
+      ? await scanDatabase(process.env.NOTION_FIRE_DB_ID!, 'FIRE') : [];
+    const immigrant = (targetDb === 'All' || targetDb === 'Immigrant' || !targetDb) 
+      ? await scanDatabase(process.env.NOTION_IMMIGRATION_DB_ID!, 'Immigrant') : [];
 
     return NextResponse.json({
       success: true,

@@ -31,6 +31,7 @@ export default function DashboardPage() {
   const [translationProgress, setTranslationProgress] = useState({ current: 0, total: 0, success: 0, fail: 0 });
   const [translationResults, setTranslationResults] = useState<any[]>([]);
   const [translationLogs, setTranslationLogs] = useState<string[]>([]);
+  const [translationTargetDb, setTranslationTargetDb] = useState<string>('All'); // New state for DB selection
 
   // SEO Fixer State
   const [loadingSeoFix, setLoadingSeoFix] = useState(false);
@@ -185,7 +186,9 @@ export default function DashboardPage() {
     setTranslationResults([]);
     setError(null);
     try {
-      const res = await fetch('/api/runner/translation-manager');
+      // Pass targetDb as query param if not 'All'
+      const query = translationTargetDb !== 'All' ? `?target=${translationTargetDb}` : '';
+      const res = await fetch(`/api/runner/translation-manager${query}`);
       const data = await res.json();
       if (data.success) {
         setTranslationScanResult(data.data);
@@ -631,6 +634,17 @@ export default function DashboardPage() {
               </div>
               
               <div className="mt-5 flex items-center gap-4">
+                <select 
+                  value={translationTargetDb} 
+                  onChange={(e) => setTranslationTargetDb(e.target.value)}
+                  disabled={loadingTranslationScan || processingTranslations}
+                  className="block w-40 text-sm border-gray-300 rounded-md"
+                >
+                  <option value="All">All Databases</option>
+                  <option value="Playfish">Playfish</option>
+                  <option value="FIRE">FIRE</option>
+                  <option value="Immigrant">Immigrant</option>
+                </select>
                 <button
                   onClick={runTranslationScan}
                   disabled={loadingTranslationScan || processingTranslations}

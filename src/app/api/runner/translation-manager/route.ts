@@ -6,8 +6,11 @@ export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const targetDb = searchParams.get('target');
+
   try {
-    const tasks = await scanForMissingTranslations();
+    const tasks = await scanForMissingTranslations(targetDb as any);
     return NextResponse.json({
       success: true,
       data: tasks,
