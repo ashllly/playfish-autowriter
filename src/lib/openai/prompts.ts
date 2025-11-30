@@ -400,9 +400,14 @@ AI 应：
     **TRANSLATE ALL CHINESE TEXT TO ENGLISH.**
     Do NOT leave any Chinese characters in the output.
     
+    [TITLE CASE RULES]
+    Translate the main article "title" using **Title Case**:
+    - Capitalize the first word, last word, and all principal words.
+    - Lowercase articles (a, an, the), coordinating conjunctions (and, but, or), and prepositions of 4 letters or fewer (in, on, at, to, for, etc.), unless they start the sentence.
+    
     [FORMATTING RULES - TRANSLATE TEXT, PRESERVE SYNTAX]
     
-    1. **Headings**: Translate the text, keep the \`##\` or \`###\` syntax.
+    1. **Headings**: Translate the text (use Title Case as well), keep the \`##\` or \`###\` syntax.
        Example: \`## 投资心理误区\` -> \`## Investment Psychology Pitfalls\`
     
     2. **Images**: Translate the ALT text, keep the URL unchanged.
